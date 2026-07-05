@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { UserButton } from "@clerk/clerk-react";
+import SplitSnapWordmark from "./SplitSnapWordmark";
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -7,7 +8,7 @@ interface AppLayoutProps {
 
 export default function AppLayout({ children }: AppLayoutProps) {
   return (
-    <div className="min-h-screen bg-neutral-950 text-neutral-100">
+    <div className="min-h-screen text-neutral-100">
       <header className="border-b border-neutral-800 bg-neutral-900/80 backdrop-blur sticky top-0 z-10">
         <div className="max-w-3xl mx-auto px-4 py-4 flex items-center justify-between">
           <Link to="/app" className="flex items-center gap-3">
@@ -17,10 +18,8 @@ export default function AppLayout({ children }: AppLayoutProps) {
               className="h-9 w-9 object-contain"
             />
             <div>
-              <h1 className="text-2xl font-extrabold tracking-tight bg-linear-to-br from-amber-200 via-amber-400 to-amber-700 bg-clip-text text-transparent">
-                SplitSnap
-              </h1>
-              <p className="text-xs text-neutral-400">
+              <SplitSnapWordmark as="h1" size="lg" />
+              <p className="text-xs leading-relaxed text-neutral-100">
                 Scan the bill. Tap what you ate. Pay your share.
               </p>
             </div>

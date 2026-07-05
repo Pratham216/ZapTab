@@ -11,6 +11,7 @@ import ItemSelectionList, {
   applySelectionChange,
 } from "../components/ItemSelectionList";
 import { getParticipantShare } from "../lib/payments";
+import { copyToClipboard } from "../lib/clipboard";
 import type { Participant, Room } from "../api/rooms";
 
 export default function RoomPage() {
@@ -18,6 +19,7 @@ export default function RoomPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [copied, setCopied] = useState(false);
+  const [copyError, setCopyError] = useState<string | null>(null);
   const [selectionError, setSelectionError] = useState<string | null>(null);
   const [updatingItemId, setUpdatingItemId] = useState<string | null>(null);
   const roomCode = code?.toUpperCase() ?? "";
@@ -62,9 +64,16 @@ export default function RoomPage() {
 
   async function copyLink() {
     if (!room?.joinUrl) return;
-    await navigator.clipboard.writeText(room.joinUrl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    setCopyError(null);
+
+    const ok = await copyToClipboard(room.joinUrl);
+    if (ok) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+      return;
+    }
+
+    setCopyError("Couldn't copy automatically — tap the link above to select it");
   }
 
   async function handleLeave() {
@@ -125,29 +134,16 @@ export default function RoomPage() {
 
   return (
     <div className="space-y-7">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight">
-            {bill?.restaurantName || "Split room"}
-          </h2>
-          <p className="text-neutral-400 text-sm mt-2">
-            Code: <span className="font-mono text-amber-400 font-medium">{room.code}</span>
-            {isHost && (
-              <span className="ml-2 text-xs bg-amber-500/15 text-amber-300 px-2 py-0.5 rounded-full border border-amber-500/20">
-                Host
-              </span>
-            )}
-          </p>
-        </div>
-        <span
-          className={`text-xs px-2.5 py-1 rounded-full border ${
-            room.status === "open"
-              ? "bg-amber-500/10 text-amber-300 border-amber-500/20"
-              : "bg-neutral-800 text-neutral-400 border-neutral-700"
-          }`}
-        >
-          {room.status}
-        </span>
+      <div>
+        <h2 className="text-3xl font-bold tracking-tight">
+          {bill?.restaurantName || "Split room"}
+        </h2>
+        <p className="text-neutral-400 text-sm mt-2">
+          Code: <span className="font-mono text-amber-400 font-medium">{room.code}</span>
+          {isHost && (
+            <span className="ml-2 badge-gold">Host</span>
+          )}
+        </p>
       </div>
 
       {isHost && (
@@ -164,23 +160,27 @@ export default function RoomPage() {
       )}
 
       <div className="grid gap-6 sm:grid-cols-2">
-        <div className="rounded-2xl border border-neutral-800 bg-neutral-900/30 p-5 space-y-3">
+        <div className="rounded-2xl border border-neutral-800 p-5 space-y-3">
           <h3 className="font-semibold text-sm text-neutral-200">Invite friends</h3>
           <div className="flex justify-center">
             <QRDisplay url={room.joinUrl} />
           </div>
-          <p className="text-xs text-neutral-500 text-center break-all font-mono">
+          <p className="text-xs text-neutral-500 text-center break-all font-mono select-all">
             {room.joinUrl}
           </p>
           <button
+            type="button"
             onClick={copyLink}
-            className="w-full py-2.5 rounded-xl border border-neutral-700 bg-neutral-900/60 hover:border-amber-500/40 hover:bg-neutral-900 text-sm transition-colors"
+            className="btn-copy-shimmer"
           >
             {copied ? "Link copied!" : "Copy invite link"}
           </button>
+          {copyError ? (
+            <p className="text-xs text-amber-300/90 text-center">{copyError}</p>
+          ) : null}
         </div>
 
-        <div className="rounded-2xl border border-neutral-800 bg-neutral-900/30 p-5">
+        <div className="rounded-2xl border border-neutral-800 p-5">
           <h3 className="font-semibold text-sm text-neutral-200 mb-3">
             Participants ({room.participants.length})
           </h3>
@@ -191,15 +191,19 @@ export default function RoomPage() {
               return (
               <li
                 key={p.id}
-                className="flex items-center gap-2 text-sm bg-neutral-900/50 rounded-xl px-3 py-2.5"
+                className="flex items-center gap-2 text-sm rounded-xl px-3 py-2.5"
               >
-                <span className="w-8 h-8 rounded-full bg-amber-500/15 text-amber-300 flex items-center justify-center font-medium">
+                <span className="w-8 h-8 rounded-full bg-neutral-800 text-neutral-100 flex items-center justify-center font-medium">
                   {p.name.charAt(0).toUpperCase()}
                 </span>
                 <span className="flex-1 min-w-0 truncate">{p.name}</span>
                 <div className="flex items-center gap-2 shrink-0">
                   {!isRoomHost && share && share.total > 0 && (
-                    <span className="text-xs text-neutral-500">
+                    <span
+                      className={`text-xs font-medium ${
+                        p.paid ? "text-emerald-400" : "text-red-400"
+                      }`}
+                    >
                       ₹{share.total.toFixed(0)}
                     </span>
                   )}
@@ -209,7 +213,7 @@ export default function RoomPage() {
                     </span>
                   )}
                   {isRoomHost && (
-                    <span className="text-xs text-neutral-500">host</span>
+                    <span className="badge-gold">host</span>
                   )}
                 </div>
               </li>
@@ -244,17 +248,11 @@ export default function RoomPage() {
       />
 
       <div className="flex gap-3">
-        <button
-          onClick={handleLeave}
-          className="px-4 py-2.5 rounded-xl border border-neutral-700 text-neutral-400 text-sm hover:bg-neutral-900 transition-colors"
-        >
+        <button onClick={handleLeave} className="btn-danger-outline">
           Leave room
         </button>
         {bill && (
-          <Link
-            to={`/bill/${bill.id}`}
-            className="px-4 py-2.5 rounded-xl border border-neutral-700 bg-neutral-900/60 text-sm hover:border-amber-500/40 transition-colors"
-          >
+          <Link to={`/bill/${bill.id}`} className="btn-gold-outline">
             Edit bill
           </Link>
         )}

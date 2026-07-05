@@ -16,6 +16,7 @@ import { createRoom } from "../api/rooms";
 import { getCurrentUser } from "../api/users";
 import { recalcBillFromItems, recalcGrandTotal, sumItemPrices, applyItemFieldUpdate } from "../lib/billTotals";
 import { useDebouncedCallback } from "../hooks/useDebouncedCallback";
+import AnimatedEllipsis from "../components/AnimatedEllipsis";
 
 export default function BillPage() {
   const { id } = useParams<{ id: string }>();
@@ -106,6 +107,7 @@ function ProcessingState() {
       <div className="space-y-1.5">
         <h2 className="text-xl font-semibold text-neutral-100">
           Analyzing your bill
+          <AnimatedEllipsis />
         </h2>
         <p className="text-neutral-400 text-sm max-w-xs">
           We're reading the receipt and itemizing everything. This only takes a
@@ -211,6 +213,7 @@ function BillEditor({ bill: initialBill }: { bill: Bill }) {
   const [creatingRoom, setCreatingRoom] = useState(false);
   const [roomError, setRoomError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [focusItemId, setFocusItemId] = useState<string | null>(null);
 
   const { data: currentUser } = useQuery({
     queryKey: ["current-user"],
@@ -299,6 +302,8 @@ function BillEditor({ bill: initialBill }: { bill: Bill }) {
       dirtyRef.current = false;
       setDraft(recalcBillFromItems(serverBill));
       queryClient.setQueryData(["bill", id], serverBill);
+      const newItem = serverBill.items.at(-1);
+      if (newItem) setFocusItemId(newItem.id);
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : "Failed to add item");
     }
@@ -343,44 +348,50 @@ function BillEditor({ bill: initialBill }: { bill: Bill }) {
 
   return (
     <div className="space-y-7">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight">Review your bill</h2>
-          <p className="text-neutral-400 text-sm mt-2">
-            Fix any mistakes before sharing with friends.
-          </p>
+      <div>
+        <h2 className="text-3xl font-bold tracking-tight text-brand">
+          Review your bill
+        </h2>
+        <p className="bill-subtitle">
+          Fix any mistakes before sharing with friends.
+        </p>
+      </div>
+
+      <div className="bill-card p-5">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field
+            label="Restaurant"
+            value={draft.restaurantName}
+            onChange={(v) => handleBillFieldChange({ restaurantName: v })}
+          />
+          <Field
+            label="Date"
+            value={draft.billDate}
+            onChange={(v) => handleBillFieldChange({ billDate: v })}
+          />
         </div>
-        <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full border border-neutral-700 bg-neutral-900 text-neutral-300">
-          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-          Parsed
-        </span>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field
-          label="Restaurant"
-          value={draft.restaurantName}
-          onChange={(v) => handleBillFieldChange({ restaurantName: v })}
-        />
-        <Field
-          label="Date"
-          value={draft.billDate}
-          onChange={(v) => handleBillFieldChange({ billDate: v })}
-        />
-      </div>
-
-      <div className="rounded-2xl border border-neutral-800 overflow-hidden bg-neutral-900/30">
-        <div className="px-4 py-3 flex items-center justify-between border-b border-neutral-800">
+      <div className="bill-card">
+        <div className="bill-card-header">
           <h3 className="font-semibold text-neutral-100">Items</h3>
           <button
+            type="button"
             onClick={handleAddItem}
-            className="inline-flex items-center gap-1 text-sm font-medium text-amber-400 hover:text-amber-300 transition-colors"
+            className="inline-flex items-center gap-1 text-sm font-medium text-amber-300 hover:text-amber-200 transition-colors"
           >
             <span className="text-base leading-none">+</span> Add item
           </button>
         </div>
 
-        <div className="divide-y divide-neutral-800/70">
+        <div className="bill-col-header">
+          <span className="col-span-6">Item</span>
+          <span className="col-span-2">Qty</span>
+          <span className="col-span-3">Amount</span>
+          <span className="col-span-1" />
+        </div>
+
+        <div className="divide-y divide-neutral-800">
           {draft.items.length === 0 && (
             <p className="px-4 py-6 text-sm text-neutral-500 text-center">
               No items extracted. Add items manually.
@@ -392,19 +403,14 @@ function BillEditor({ bill: initialBill }: { bill: Bill }) {
               item={item}
               onChange={handleItemChange}
               onDelete={handleDeleteItem}
+              autoFocusName={focusItemId === item.id}
+              onNameFocused={() => setFocusItemId(null)}
             />
           ))}
         </div>
-
-        <div className="bg-neutral-900/40 px-4 py-2 text-xs text-neutral-500 grid grid-cols-12 gap-2 border-t border-neutral-800">
-          <span className="col-span-6">Item</span>
-          <span className="col-span-2">Qty</span>
-          <span className="col-span-3">Amount</span>
-          <span className="col-span-1" />
-        </div>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 rounded-2xl border border-neutral-800 p-5 bg-neutral-900/30">
+      <div className="bill-totals-card">
         <NumberField
           label="Tax (GST)"
           value={draft.tax}
@@ -424,16 +430,17 @@ function BillEditor({ bill: initialBill }: { bill: Bill }) {
           label="Grand total"
           value={displayGrandTotal}
           onChange={(v) => handleBillFieldChange({ grandTotal: v })}
+          highlight
         />
       </div>
 
       <div className="card-premium p-5 space-y-5">
         <div className="pointer-events-none absolute -top-16 -right-16 h-40 w-40 rounded-full bg-amber-500/10 blur-3xl" />
         <div className="relative">
-          <p className="text-xs uppercase tracking-wider text-amber-200/70">
+          <p className="text-xs uppercase tracking-wider text-neutral-100">
             Items total
           </p>
-          <p className="mt-1 text-3xl font-bold text-brand">
+          <p className="text-3xl font-bold text-brand">
             ₹{itemsTotal.toFixed(2)}
           </p>
         </div>
@@ -451,9 +458,10 @@ function BillEditor({ bill: initialBill }: { bill: Bill }) {
             </div>
           )}
           <button
+            type="button"
             onClick={handleCreateRoom}
             disabled={creatingRoom}
-            className="btn-primary px-5 py-2.5 text-sm whitespace-nowrap sm:w-auto w-full"
+            className="btn-primary-shimmer px-5 py-2.5 text-sm whitespace-nowrap sm:w-auto w-full"
           >
             {creatingRoom ? "Creating..." : "Create room & share"}
           </button>
@@ -470,14 +478,25 @@ function BillItemRow({
   item,
   onChange,
   onDelete,
+  autoFocusName = false,
+  onNameFocused,
 }: {
   item: BillItem;
   onChange: (itemId: string, data: Partial<BillItem>) => void;
   onDelete: (itemId: string) => void;
+  autoFocusName?: boolean;
+  onNameFocused?: () => void;
 }) {
   const [qtyText, setQtyText] = useState(String(item.quantity));
   const [priceText, setPriceText] = useState(String(item.price));
   const priceFocusedRef = useRef(false);
+  const nameInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!autoFocusName) return;
+    nameInputRef.current?.focus();
+    onNameFocused?.();
+  }, [autoFocusName, onNameFocused]);
 
   useEffect(() => {
     setQtyText(String(item.quantity));
@@ -508,9 +527,10 @@ function BillItemRow({
   }
 
   return (
-    <div className="px-4 py-3 grid grid-cols-12 gap-2 items-center hover:bg-neutral-900/40 transition-colors">
+    <div className="px-4 py-3 grid grid-cols-12 gap-2 items-center">
       <input
-        className="col-span-6 bg-neutral-800/40 border border-neutral-700 rounded-lg px-3 py-2 text-sm outline-none transition focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/30"
+        ref={nameInputRef}
+        className="col-span-6 bill-input"
         value={item.name}
         placeholder="Item name"
         onChange={(e) => onChange(item.id, { name: e.target.value })}
@@ -518,7 +538,7 @@ function BillItemRow({
       <input
         type="text"
         inputMode="numeric"
-        className="col-span-2 bg-neutral-800/40 border border-neutral-700 rounded-lg px-3 py-2 text-sm outline-none transition focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/30"
+        className="col-span-2 bill-input"
         value={qtyText}
         onChange={(e) => {
           setQtyText(e.target.value);
@@ -530,11 +550,11 @@ function BillItemRow({
         onBlur={() => commitQty(qtyText)}
       />
       <div className="col-span-3 flex items-center gap-1">
-        <span className="text-neutral-500 text-sm">₹</span>
+        <span className="bill-rupee">₹</span>
         <input
           type="text"
           inputMode="decimal"
-          className="w-full bg-neutral-800/40 border border-neutral-700 rounded-lg px-3 py-2 text-sm outline-none transition focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/30"
+          className="w-full bill-input"
           value={priceText}
           onFocus={() => {
             priceFocusedRef.current = true;
@@ -553,8 +573,9 @@ function BillItemRow({
         />
       </div>
       <button
+        type="button"
         onClick={() => onDelete(item.id)}
-        className="col-span-1 text-neutral-500 hover:text-red-400 text-lg"
+        className="col-span-1 text-neutral-500 hover:text-red-400 text-lg transition-colors"
         title="Remove"
       >
         ×
@@ -574,9 +595,9 @@ function Field({
 }) {
   return (
     <label className="block space-y-1.5">
-      <span className="text-xs font-medium text-neutral-400">{label}</span>
+      <span className="bill-label">{label}</span>
       <input
-        className="w-full input-field"
+        className="w-full bill-input"
         value={value}
         onChange={(e) => onChange(e.target.value)}
       />
@@ -588,10 +609,12 @@ function NumberField({
   label,
   value,
   onChange,
+  highlight = false,
 }: {
   label: string;
   value: number;
   onChange: (v: number) => void;
+  highlight?: boolean;
 }) {
   const [text, setText] = useState(String(value));
 
@@ -601,13 +624,23 @@ function NumberField({
 
   return (
     <label className="block space-y-1.5">
-      <span className="text-xs font-medium text-neutral-400">{label}</span>
-      <div className="flex items-center gap-1.5 bg-neutral-900/60 border border-neutral-700 rounded-xl px-3 py-2.5 transition focus-within:border-amber-500/50 focus-within:ring-1 focus-within:ring-amber-500/30">
-        <span className="text-neutral-500 text-sm">₹</span>
+      <span className={highlight ? "text-xs font-semibold uppercase tracking-wider text-amber-300" : "bill-label"}>
+        {label}
+      </span>
+      <div
+        className={`flex items-center gap-1.5 border rounded-xl px-3 py-2.5 transition shadow-sm shadow-black/20 focus-within:border-amber-400/60 focus-within:ring-1 focus-within:ring-amber-400/30 ${
+          highlight
+            ? "bill-total-highlight"
+            : "bg-transparent border-neutral-700"
+        }`}
+      >
+        <span className="bill-rupee">₹</span>
         <input
           type="text"
           inputMode="decimal"
-          className="w-full bg-transparent text-sm outline-none"
+          className={`w-full bg-transparent text-sm outline-none ${
+            highlight ? "font-semibold text-amber-100" : "text-neutral-100"
+          }`}
           value={text}
           onChange={(e) => {
             setText(e.target.value);
