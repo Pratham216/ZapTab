@@ -27,7 +27,7 @@ export default function ProtectedRoute({
 
   if (!isLoaded) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-neutral-950 text-neutral-300">
+      <div className="min-h-screen flex items-center justify-center text-neutral-300">
         <div className="w-8 h-8 border-2 border-neutral-500 border-t-white rounded-full animate-spin" />
       </div>
     );
@@ -39,7 +39,7 @@ export default function ProtectedRoute({
 
   if (isLoading && isUserSession()) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-neutral-950 text-neutral-300">
+      <div className="min-h-screen flex items-center justify-center text-neutral-300">
         <div className="w-8 h-8 border-2 border-neutral-500 border-t-white rounded-full animate-spin" />
       </div>
     );

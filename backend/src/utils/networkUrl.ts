@@ -83,4 +83,8 @@ export function logNetworkInfo(): void {
     console.log(`  [${c.score}] ${c.iface} → ${c.ip}`);
   }
   console.log(`Invite links use: ${getAppBaseUrl()}`);
+  const ip = getLocalLanIp();
+  if (ip) {
+    console.log(`Mobile API URL: http://${ip}:${config.port}`);
+  }
 }

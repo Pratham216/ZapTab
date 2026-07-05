@@ -2,6 +2,7 @@ packages:
   - "shared"
   - "backend"
   - "frontend"
+  - "mobile"
 onlyBuiltDependencies:
   - esbuild
   - sharp

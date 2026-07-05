@@ -8,6 +8,8 @@
     "predev:backend": "pnpm --filter shared build && pnpm free-port",
     "dev:backend": "pnpm --filter backend dev",
     "dev:frontend": "pnpm --filter frontend dev",
+    "dev:mobile": "pnpm --filter shared build && pnpm --filter mobile start:clean",
+    "dev:mobile:local": "pnpm --filter shared build && node scripts/sync-mobile-api-url.mjs --local && pnpm --filter mobile start:clean",
     "build": "pnpm --filter shared build && pnpm --filter backend build && pnpm --filter frontend build"
   },
   "engines": {

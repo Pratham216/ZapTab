@@ -83,12 +83,12 @@ export default function ScanPage() {
           ${
             dragOver
               ? "border-amber-400 bg-amber-400/10 scale-[1.01]"
-              : "border-neutral-700 bg-neutral-900/40 hover:border-amber-500/60 hover:bg-neutral-900/70"
+              : "border-amber-500/35 bg-amber-500/5 hover:border-amber-400/60 hover:bg-amber-400/10"
           }
           ${uploading ? "pointer-events-none" : ""}
         `}
       >
-        <div className="pointer-events-none absolute inset-0 bg-linear-to-b from-amber-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+        <div className="pointer-events-none absolute inset-0 bg-linear-to-b from-amber-500/8 to-transparent opacity-60 group-hover:opacity-100 transition-opacity" />
 
         <input
           ref={fileInputRef}
@@ -132,7 +132,7 @@ export default function ScanPage() {
             </>
           ) : (
             <>
-              <span className="flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-400 transition-transform group-hover:scale-110">
+              <span className="flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-400 transition-transform group-hover:scale-110">
                 <svg
                   className="h-8 w-8"
                   viewBox="0 0 24 24"
@@ -181,7 +181,7 @@ export default function ScanPage() {
         <div className="mt-4 grid gap-4 sm:grid-cols-3">
           {steps.map((step, i) => (
             <div key={step.title} className="flex gap-3 sm:flex-col sm:gap-2">
-              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-amber-500/15 text-xs font-bold text-amber-400">
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-neutral-800 border border-neutral-700 text-xs font-bold text-neutral-300">
                 {i + 1}
               </span>
               <div>

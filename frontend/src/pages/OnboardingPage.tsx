@@ -56,14 +56,14 @@ export default function OnboardingPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-neutral-950 text-neutral-300">
+      <div className="min-h-screen flex items-center justify-center text-neutral-300">
         <div className="w-8 h-8 border-2 border-neutral-500 border-t-white rounded-full animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-neutral-950 text-neutral-100 flex items-center justify-center px-4">
+    <div className="min-h-screen text-neutral-100 flex items-center justify-center px-4">
       <div className="w-full max-w-md space-y-8">
         <div className="text-center space-y-3">
           <p className="text-xs uppercase tracking-[0.3em] text-neutral-500">
@@ -101,7 +101,7 @@ export default function OnboardingPage() {
           <button
             type="submit"
             disabled={saving}
-            className="w-full py-3 rounded-lg bg-white text-black font-medium hover:bg-neutral-200 transition-colors disabled:opacity-50"
+            className="w-full py-3 rounded-lg btn-primary disabled:opacity-50"
           >
             {saving ? "Saving..." : "Continue to SplitSnap"}
           </button>

@@ -1,68 +1,62 @@
 # SplitSnap
 
-> Scan the bill. Tap what you ate. Pay your share.
+### Scan the bill. Tap what you ate. Pay your share.
 
-Week 1 MVP: upload a receipt, OCR with Tesseract, parse with OpenRouter, review and edit extracted items.
+SplitSnap is a bill-splitting app for group dinners. Snap a receipt, split it item by item, and settle up with UPI — no spreadsheets, no awkward math at the table.
 
-## Stack
+**Dinner shouldn't end in math class.**
 
-- **Frontend:** React, TypeScript, Tailwind, Vite
-- **Backend:** Express, MongoDB, Tesseract OCR, OpenRouter
-- **Images:** Local temp storage, auto-deleted after 30 minutes (or immediately on success)
+---
 
-## Prerequisites
+## Scan
 
-- Node.js 20+
-- pnpm
-- Docker Desktop (for MongoDB)
-- Tesseract OCR installed (`tesseract --version`)
+**Turn any receipt into a clean, editable bill.**
 
-## Setup
+- Upload a photo of the bill — AI reads line items, quantities, tax, and totals
+- Review and fix anything before you share
+- Add, edit, or remove items in seconds
+- Retry parsing if the first pass misses something
 
-```bash
-# Install dependencies
-pnpm install
+---
 
-# Start MongoDB
-docker compose up -d
+## Split
 
-# Configure backend
-cp backend/.env.example backend/.env
-# Add your OPENROUTER_API_KEY to backend/.env
+**Everyone picks what they had. The math handles itself.**
 
-# Build shared package
-pnpm --filter shared build
+- Create a room and invite friends with a link or QR code
+- Guests join instantly — no account required
+- Tap the dishes you ate; shares update in real time
+- Tax and service charge split fairly across the table
+- See who claimed what, what's still unclaimed, and what each person owes
+- Search dishes, adjust quantities, live sync as the room fills up
 
-# Run dev servers (backend + frontend)
-pnpm dev
-```
+---
 
-- Frontend: http://localhost:5173
-- Backend: http://localhost:3001
+## Pay
 
-## API
+**From bill to UPI in one tap.**
 
-| Method | Route | Description |
-|--------|-------|-------------|
-| POST | `/bills/upload` | Upload receipt image |
-| GET | `/bills/:id` | Get bill with items |
-| GET | `/bills/:id/status` | Poll processing status |
-| PATCH | `/bills/:id` | Edit bill metadata |
-| POST | `/bills/:id/items` | Add item |
-| PATCH | `/bills/:id/items/:itemId` | Edit item |
-| DELETE | `/bills/:id/items/:itemId` | Remove item |
-| POST | `/bills/:id/retry` | Retry OCR/parse |
+- Host adds a UPI ID once — guests pay the right amount every time
+- One tap opens your UPI app with the exact share pre-filled
+- Mark yourself as paid; host sees who's settled and who's pending
+- Golden totals, clear status — paid, pending, and owed at a glance
 
-## Environment Variables
+---
 
-See `backend/.env.example`.
+## Built for real dinners
 
-- `OPENROUTER_API_KEY` — optional; without it, a basic rule-based parser is used
-- `TESSERACT_PATH` — path to tesseract.exe on Windows
-- `TEMP_FILE_TTL_MS` — temp image retention (default 30 min)
+| | |
+|---|---|
+| **Fair by default** | Item-level splitting, not vague "split evenly" guesses |
+| **Live rooms** | Selections and payments sync as people join and tap |
+| **Host & guest flows** | Hosts manage the bill; friends jump in with a link |
+| **India-first payments** | UPI deep links with the correct amount, every time |
+| **Dark, polished UI** | Gold accents, green for paid, grid texture, zero clutter |
 
-## Week 2 (coming)
+---
 
-- Auth (guest + Google)
-- Room creation, QR join
-- Attach bill to room
+<p align="center">
+  <br />
+  <strong>SplitSnap</strong><br />
+  <sub>Receipt → room → settled.</sub>
+</p>

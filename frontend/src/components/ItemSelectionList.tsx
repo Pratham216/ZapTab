@@ -138,8 +138,8 @@ function ClaimBadges({
             key={guestId}
             className={`text-xs px-1.5 py-0.5 rounded-full ${
               isMine
-                ? "bg-white/15 text-white"
-                : "bg-neutral-800 text-neutral-400"
+                ? "bg-emerald-500/15 text-emerald-300"
+                : "bg-amber-500/15 text-amber-200"
             }`}
           >
             {person.name}
@@ -221,26 +221,42 @@ export default function ItemSelectionList({
   const unclaimedUnits = getUnclaimedUnitsCount(billForShare, displaySelections);
 
   return (
-    <div className="rounded-2xl border border-neutral-800 overflow-hidden bg-neutral-900/30">
+    <div className="rounded-2xl border border-neutral-800 overflow-hidden">
       <div className="px-4 py-3 border-b border-neutral-800 space-y-3">
         <div className="flex items-center justify-between gap-3">
           <h3 className="font-semibold text-neutral-100">Tap what you had</h3>
           {unclaimedUnits > 0 && (
-            <span className="text-xs text-amber-400/90 shrink-0">
+            <span className="text-xs text-amber-400 shrink-0 font-medium">
               {unclaimedUnits} unclaimed
             </span>
           )}
         </div>
-        <input
-          type="search"
-          value={searchInput}
-          onChange={(e) => {
-            setSearchInput(e.target.value);
-            applySearch(e.target.value);
-          }}
-          placeholder="Search dishes..."
-          className="w-full input-field py-2 text-sm"
-        />
+        <div className="relative">
+          <svg
+            className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 shrink-0 text-neutral-500"
+            width={16}
+            height={16}
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            aria-hidden
+          >
+            <circle cx="11" cy="11" r="7" />
+            <path d="M20 20l-4-4" />
+          </svg>
+          <input
+            type="search"
+            value={searchInput}
+            onChange={(e) => {
+              setSearchInput(e.target.value);
+              applySearch(e.target.value);
+            }}
+            placeholder="Search dishes..."
+            className="w-full input-field py-2 pl-9 text-sm"
+          />
+        </div>
       </div>
 
       <div className="divide-y divide-neutral-800/70">
@@ -293,8 +309,8 @@ export default function ItemSelectionList({
                 myQty > 0 && isMultiQty ? "items-start" : "items-center"
               } ${canToggle ? "cursor-pointer" : "cursor-default"} ${
                 myQty > 0
-                  ? "bg-white/5 border-white/70"
-                  : "border-transparent hover:bg-neutral-900/40"
+                  ? "bg-emerald-500/10 border-emerald-400/50"
+                  : "border-transparent"
               }`}
             >
               <div
@@ -309,7 +325,7 @@ export default function ItemSelectionList({
                   onChange={(e) =>
                     handleSetQuantity(item.id, e.target.checked ? 1 : 0)
                   }
-                  className="w-4 h-4 rounded border-neutral-500 text-neutral-200 focus:ring-white/30 disabled:opacity-50"
+                  className="w-4 h-4 rounded border-neutral-500 text-emerald-400 focus:ring-emerald-500/30 disabled:opacity-50"
                 />
               </div>
 
@@ -364,16 +380,16 @@ export default function ItemSelectionList({
       </div>
 
       {myShare && (
-        <div className="relative border-t border-amber-500/20 bg-linear-to-br from-amber-500/10 via-neutral-900/40 to-neutral-900/40 px-4 py-4 space-y-1">
+        <div className="share-footer px-4 py-4 space-y-1">
           <div className="flex items-center justify-between">
-            <span className="text-xs uppercase tracking-wider text-amber-200/70">
+            <span className="text-xs uppercase tracking-wider text-emerald-300/80">
               Your share
             </span>
-            <span className="text-2xl font-bold text-brand">
+            <span className="text-2xl font-bold text-emerald-300">
               ₹{myShare.total.toFixed(2)}
             </span>
           </div>
-          <p className="text-xs text-neutral-400">
+          <p className="text-xs text-neutral-100">
             Items ₹{myShare.itemsTotal.toFixed(2)}
             {myShare.tax > 0 && ` · Tax ₹${myShare.tax.toFixed(2)}`}
             {myShare.serviceCharge > 0 &&
