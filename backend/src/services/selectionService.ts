@@ -1,5 +1,5 @@
 import type { IRoom, IItemSelection } from "../models/Room";
-import type { SelectionsMap } from "@splitsnap/shared";
+import type { SelectionsMap } from "@zaptab/shared";
 import { Bill } from "../models/Bill";
 import { Participant } from "../models/Participant";
 import { getRoomByCode } from "./roomService";

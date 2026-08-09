@@ -5,7 +5,7 @@ import {
   getMyQuantity,
   getTotalClaimedForItem,
   getUnclaimedUnitsCount,
-} from "@splitsnap/shared";
+} from "@zaptab/shared";
 import type { Bill, BillItem } from "../api/bills";
 import type { Participant, Room } from "../api/rooms";
 import { useDebouncedCallback } from "../hooks/useDebouncedCallback";

@@ -1,4 +1,4 @@
-import { tokens } from "@splitsnap/shared";
+import { tokens } from "@zaptab/shared";
 
 export const colors = {
   background: tokens.background,

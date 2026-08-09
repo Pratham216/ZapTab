@@ -13,6 +13,13 @@ function getSocket(): Socket {
   return socket;
 }
 
+export function disconnectSocket(): void {
+  if (socket) {
+    socket.disconnect();
+    socket = null;
+  }
+}
+
 export function useSocket(
   roomCode: string | undefined,
   handlers: {

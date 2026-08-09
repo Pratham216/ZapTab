@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 import {
   Pressable,
   StyleSheet,
@@ -8,8 +8,7 @@ import {
 } from "react-native";
 import ScreenContainer from "./ScreenContainer";
 import Button from "./Button";
-import Card from "./Card";
-import InputField from "./InputField";
+import GradientGoldText from "./GradientGoldText";
 import {
   addBillItem,
   deleteBillItem,
@@ -27,10 +26,99 @@ import {
   recalcGrandTotal,
   sumItemPrices,
 } from "../lib/billTotals";
-import { colors, fontSize, radius, spacing, typography } from "../theme";
+import { colors, fontSize, radius, spacing } from "../theme";
 
 function formatCurrency(value: number): string {
   return `₹${value.toFixed(2)}`;
+}
+
+function isTempItemId(id: string): boolean {
+  return id.startsWith("temp-");
+}
+
+function createTempItemId(): string {
+  return `temp-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
+function isItemReadyToSync(item: BillItem): boolean {
+  return (
+    item.name.trim().length > 0 &&
+    Number.isFinite(item.quantity) &&
+    item.quantity > 0 &&
+    Number.isInteger(item.quantity) &&
+    Number.isFinite(item.price) &&
+    item.price > 0
+  );
+}
+
+function validateBillItems(items: BillItem[]): string | null {
+  if (items.length === 0) {
+    return "Add at least one item before continuing";
+  }
+
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+    const label = items.length > 1 ? `Item ${i + 1}` : "Each item";
+
+    if (!item.name.trim()) {
+      return `${label} needs a name`;
+    }
+    if (
+      !Number.isFinite(item.quantity) ||
+      item.quantity <= 0 ||
+      !Number.isInteger(item.quantity)
+    ) {
+      return `${label}: quantity must be greater than 0`;
+    }
+    if (!Number.isFinite(item.price) || item.price <= 0) {
+      return `${label}: amount must be greater than 0`;
+    }
+  }
+
+  return null;
+}
+
+function hasPendingSync(draft: Bill, lastSaved: Bill): boolean {
+  for (const item of draft.items) {
+    if (isTempItemId(item.id)) {
+      if (isItemReadyToSync(item)) return true;
+      continue;
+    }
+    const saved = lastSaved.items.find((i) => i.id === item.id);
+    if (
+      !saved ||
+      saved.name !== item.name ||
+      saved.price !== item.price ||
+      saved.quantity !== item.quantity
+    ) {
+      return true;
+    }
+  }
+
+  return lastSaved.items.some(
+    (saved) => !draft.items.some((item) => item.id === saved.id)
+  );
+}
+
+function mergeDraftWithServer(
+  serverBill: Bill,
+  draft: Bill,
+  syncedTempIds: Map<string, string>
+): Bill {
+  const items = draft.items.map((item) => {
+    if (isTempItemId(item.id)) {
+      const realId = syncedTempIds.get(item.id);
+      if (realId) {
+        const fromServer = serverBill.items.find((i) => i.id === realId);
+        if (fromServer) return fromServer;
+      }
+      return item;
+    }
+    const fromServer = serverBill.items.find((i) => i.id === item.id);
+    return fromServer ?? item;
+  });
+
+  return recalcBillFromItems({ ...serverBill, items });
 }
 
 function billsMatchForSave(a: Bill, b: Bill): boolean {
@@ -56,18 +144,47 @@ function billsMatchForSave(a: Bill, b: Bill): boolean {
   });
 }
 
-async function persistBillToServer(lastSaved: Bill, draft: Bill): Promise<Bill> {
+async function persistBillToServer(
+  lastSaved: Bill,
+  draft: Bill
+): Promise<{ serverBill: Bill; syncedTempIds: Map<string, string> }> {
   let serverBill = lastSaved;
+  const syncedTempIds = new Map<string, string>();
+  const draftIds = new Set(draft.items.map((item) => item.id));
+
+  for (const savedItem of [...serverBill.items]) {
+    if (!draftIds.has(savedItem.id)) {
+      serverBill = await deleteBillItem(serverBill.id, savedItem.id);
+    }
+  }
 
   for (const item of draft.items) {
-    const saved = serverBill.items.find((i) => i.id === item.id);
+    if (!isTempItemId(item.id) || !isItemReadyToSync(item)) continue;
+
+    const beforeIds = new Set(serverBill.items.map((i) => i.id));
+    serverBill = await addBillItem(serverBill.id, {
+      name: item.name.trim(),
+      price: item.price,
+      quantity: item.quantity,
+    });
+    const added = serverBill.items.find((i) => !beforeIds.has(i.id));
+    if (added) syncedTempIds.set(item.id, added.id);
+  }
+
+  for (const item of draft.items) {
+    const serverId = isTempItemId(item.id)
+      ? syncedTempIds.get(item.id)
+      : item.id;
+    if (!serverId) continue;
+
+    const saved = serverBill.items.find((i) => i.id === serverId);
     if (
       !saved ||
       saved.name !== item.name ||
       saved.price !== item.price ||
       saved.quantity !== item.quantity
     ) {
-      serverBill = await updateBillItem(serverBill.id, item.id, {
+      serverBill = await updateBillItem(serverBill.id, serverId, {
         name: item.name,
         price: item.price,
         quantity: item.quantity,
@@ -95,41 +212,86 @@ async function persistBillToServer(lastSaved: Bill, draft: Bill): Promise<Bill> 
     serverBill = await updateBill(serverBill.id, billPatch);
   }
 
-  return serverBill;
+  return { serverBill, syncedTempIds };
 }
 
 interface BillEditorProps {
   initialBill: Bill;
   onScanAnother: () => void;
   onRoomCreated: (code: string) => void;
+  onBillChange?: (bill: Bill) => void;
+  focusSplit?: boolean;
+  defaultHostName?: string;
+  defaultHostUpiId?: string;
 }
 
 export default function BillEditor({
   initialBill,
   onScanAnother,
   onRoomCreated,
+  onBillChange,
+  focusSplit = false,
+  defaultHostName = "",
+  defaultHostUpiId = "",
 }: BillEditorProps) {
   const [draft, setDraft] = useState(initialBill);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [hostName, setHostName] = useState("");
-  const [hostUpiId, setHostUpiId] = useState("");
+  const [hostName, setHostName] = useState(defaultHostName);
+  const [hostUpiId, setHostUpiId] = useState(defaultHostUpiId);
   const [creatingRoom, setCreatingRoom] = useState(false);
   const [roomError, setRoomError] = useState<string | null>(null);
+  const [focusItemId, setFocusItemId] = useState<string | null>(null);
+  const hostNameInputRef = useRef<TextInput>(null);
 
   const draftRef = useRef(draft);
   const lastSavedRef = useRef(initialBill);
   const dirtyRef = useRef(false);
   const savingRef = useRef(false);
+  const onBillChangeRef = useRef(onBillChange);
 
   draftRef.current = draft;
+  onBillChangeRef.current = onBillChange;
+
+  function notifyBillChange(bill: Bill) {
+    onBillChangeRef.current?.(recalcBillFromItems(bill));
+  }
+
+  const notifyHistory = useDebouncedCallback(() => {
+    notifyBillChange(draftRef.current);
+  }, 150);
 
   const scheduleSave = useDebouncedCallback(() => {
     void flushSave();
-  }, 500);
+  }, 400);
 
-  async function flushSave() {
-    if (!dirtyRef.current || savingRef.current) return;
+  useEffect(() => {
+    if (defaultHostName) setHostName(defaultHostName);
+  }, [defaultHostName]);
+
+  useEffect(() => {
+    if (defaultHostUpiId) setHostUpiId(defaultHostUpiId);
+  }, [defaultHostUpiId]);
+
+  useEffect(() => {
+    if (!focusSplit) return;
+    hostNameInputRef.current?.focus();
+  }, [focusSplit]);
+
+  useEffect(() => {
+    return () => {
+      notifyHistory.cancel();
+      scheduleSave.cancel();
+      void flushSave({ force: true });
+    };
+  }, []);
+
+  async function flushSave(options?: { force?: boolean }) {
+    const shouldSave =
+      options?.force ||
+      dirtyRef.current ||
+      hasPendingSync(draftRef.current, lastSavedRef.current);
+    if (!shouldSave || savingRef.current) return;
 
     const snapshot = draftRef.current;
     savingRef.current = true;
@@ -137,12 +299,18 @@ export default function BillEditor({
     setSaveError(null);
 
     try {
-      const serverBill = await persistBillToServer(lastSavedRef.current, snapshot);
+      const { serverBill, syncedTempIds } = await persistBillToServer(
+        lastSavedRef.current,
+        snapshot
+      );
       lastSavedRef.current = serverBill;
+      const merged = mergeDraftWithServer(serverBill, snapshot, syncedTempIds);
 
-      if (billsMatchForSave(draftRef.current, snapshot)) {
-        dirtyRef.current = false;
-        setDraft(serverBill);
+      if (billsMatchForSave(draftRef.current, merged)) {
+        dirtyRef.current = hasPendingSync(merged, serverBill);
+        setDraft(merged);
+        notifyBillChange(merged);
+        if (dirtyRef.current) scheduleSave();
       } else {
         scheduleSave();
       }
@@ -156,7 +324,12 @@ export default function BillEditor({
 
   function updateDraft(updater: (current: Bill) => Bill) {
     dirtyRef.current = true;
-    setDraft((current) => updater(current));
+    setDraft((current) => {
+      const next = updater(current);
+      draftRef.current = next;
+      notifyHistory();
+      return next;
+    });
     scheduleSave();
   }
 
@@ -164,6 +337,7 @@ export default function BillEditor({
     itemId: string,
     data: { name?: string; price?: number; quantity?: number }
   ) {
+    setRoomError(null);
     updateDraft((current) => {
       const items = current.items.map((item) =>
         item.id === itemId ? applyItemFieldUpdate(item, data) : item
@@ -183,27 +357,46 @@ export default function BillEditor({
     updateDraft((current) => recalcGrandTotal({ ...current, ...fields }));
   }
 
-  async function handleAddItem() {
-    try {
-      const serverBill = await addBillItem(draft.id, {
-        name: "New item",
-        price: 0,
-        quantity: 1,
-      });
-      lastSavedRef.current = serverBill;
-      dirtyRef.current = false;
-      setDraft(recalcBillFromItems(serverBill));
-    } catch (err) {
-      setSaveError(err instanceof Error ? err.message : "Failed to add item");
-    }
+  function handleAddItem() {
+    const newItemId = createTempItemId();
+    setRoomError(null);
+    updateDraft((current) =>
+      recalcBillFromItems({
+        ...current,
+        items: [
+          ...current.items,
+          { id: newItemId, name: "", price: 0, quantity: 1 },
+        ],
+      })
+    );
+    setFocusItemId(newItemId);
   }
 
   async function handleDeleteItem(itemId: string) {
+    if (isTempItemId(itemId)) {
+      setRoomError(null);
+      updateDraft((current) =>
+        recalcBillFromItems({
+          ...current,
+          items: current.items.filter((item) => item.id !== itemId),
+        })
+      );
+      return;
+    }
+
     try {
       const serverBill = await deleteBillItem(draft.id, itemId);
       lastSavedRef.current = serverBill;
-      dirtyRef.current = false;
-      setDraft(recalcBillFromItems(serverBill));
+      setDraft((current) => {
+        const temps = current.items.filter((item) => isTempItemId(item.id));
+        const next = recalcBillFromItems({
+          ...serverBill,
+          items: [...serverBill.items, ...temps],
+        });
+        notifyBillChange(next);
+        return next;
+      });
+      dirtyRef.current = hasPendingSync(draftRef.current, serverBill);
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : "Failed to delete item");
     }
@@ -220,8 +413,20 @@ export default function BillEditor({
       return;
     }
 
-    if (dirtyRef.current) {
+    const itemError = validateBillItems(draft.items);
+    if (itemError) {
+      setRoomError(itemError);
+      return;
+    }
+
+    if (dirtyRef.current || hasPendingSync(draft, lastSavedRef.current)) {
       await flushSave();
+    }
+
+    const postSaveError = validateBillItems(draftRef.current.items);
+    if (postSaveError) {
+      setRoomError(postSaveError);
+      return;
     }
 
     setRoomError(null);
@@ -243,61 +448,58 @@ export default function BillEditor({
   return (
     <ScreenContainer scroll contentStyle={styles.screenContent}>
       <View style={styles.header}>
-        <View style={styles.headerTop}>
-          <View style={styles.headerText}>
-            <Text style={[typography.heading, styles.title]}>Review your bill</Text>
-            <Text style={styles.subtitle}>
-              Fix any mistakes before sharing with friends.
-            </Text>
-          </View>
-          <View style={styles.parsedBadge}>
-            <Text style={styles.parsedBadgeText}>Parsed</Text>
-          </View>
-        </View>
+        <GradientGoldText size="title">Review your bill</GradientGoldText>
+        <Text style={styles.subtitle}>
+          Fix any mistakes before sharing with friends.
+        </Text>
         {saving ? <Text style={styles.savingText}>Saving…</Text> : null}
       </View>
 
-      <InputField
-        label="Restaurant"
-        value={draft.restaurantName}
-        onChangeText={(v) => handleBillFieldChange({ restaurantName: v })}
-        placeholder="Restaurant name"
-        style={styles.field}
-      />
-      <InputField
-        label="Date"
-        value={draft.billDate}
-        onChangeText={(v) => handleBillFieldChange({ billDate: v })}
-        placeholder="Bill date"
-        style={styles.field}
-      />
-
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Items</Text>
-        <Pressable onPress={handleAddItem} hitSlop={8}>
-          <Text style={styles.addLink}>+ Add item</Text>
-        </Pressable>
+      <View style={styles.billCard}>
+        <View style={styles.metaGrid}>
+          <BillField
+            label="Restaurant"
+            value={draft.restaurantName}
+            onChangeText={(v) => handleBillFieldChange({ restaurantName: v })}
+          />
+          <BillField
+            label="Date"
+            value={draft.billDate}
+            onChangeText={(v) => handleBillFieldChange({ billDate: v })}
+          />
+        </View>
       </View>
 
-      {draft.items.length === 0 ? (
-        <Card>
-          <Text style={styles.emptyText}>
-            No items extracted. Tap "+ Add item" to add manually.
-          </Text>
-        </Card>
-      ) : (
-        <>
-          <View style={styles.itemColumnHeader}>
-            <Text style={[styles.itemColumnHeaderText, styles.itemColumnItem]}>
-              Item
+      <View style={styles.billCard}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Items</Text>
+          <Pressable onPress={handleAddItem} hitSlop={8}>
+            <Text style={styles.addLink}>
+              <Text style={styles.addPlus}>+</Text> Add item
             </Text>
-            <Text style={[styles.itemColumnHeaderText, styles.itemColumnQty]}>
-              Qty
-            </Text>
-            <Text style={[styles.itemColumnHeaderText, styles.itemColumnAmount]}>
-              Amount
-            </Text>
+          </Pressable>
+        </View>
+
+        {draft.items.length > 0 ? (
+          <View style={styles.gridRowHeader}>
+            <View style={styles.colItem}>
+              <Text style={styles.itemColumnHeaderText}>Item</Text>
+            </View>
+            <View style={styles.colQty}>
+              <Text style={styles.itemColumnHeaderText}>Qty</Text>
+            </View>
+            <View style={styles.colAmount}>
+              <Text style={styles.itemColumnHeaderText}>Amount</Text>
+            </View>
+            <View style={styles.colAction} />
           </View>
+        ) : null}
+
+        {draft.items.length === 0 ? (
+          <Text style={styles.emptyText}>
+            No items extracted. Add items manually.
+          </Text>
+        ) : (
           <View style={styles.itemList}>
             {draft.items.map((item) => (
               <EditableItemRow
@@ -305,13 +507,15 @@ export default function BillEditor({
                 item={item}
                 onChange={handleItemChange}
                 onDelete={handleDeleteItem}
+                autoFocusName={focusItemId === item.id}
+                onNameFocused={() => setFocusItemId(null)}
               />
             ))}
           </View>
-        </>
-      )}
+        )}
+      </View>
 
-      <Card style={styles.totalsCard}>
+      <View style={styles.totalsCard}>
         <NumberField
           label="Tax (GST)"
           value={draft.tax}
@@ -331,44 +535,30 @@ export default function BillEditor({
           label="Grand total"
           value={displayGrandTotal}
           onChange={(v) => handleBillFieldChange({ grandTotal: v })}
+          highlight
         />
-      </Card>
+      </View>
 
-      <Card style={styles.itemsTotalCard}>
+      <View style={styles.premiumCard}>
         <Text style={styles.itemsTotalLabel}>Items total</Text>
-        <Text style={styles.itemsTotalValue}>{formatCurrency(itemsTotal)}</Text>
-        <View style={styles.breakdown}>
-          <BreakdownRow label="Subtotal" value={formatCurrency(displaySubtotal)} />
-          <BreakdownRow label="Tax" value={formatCurrency(draft.tax)} />
-          <BreakdownRow
-            label="Service charge"
-            value={formatCurrency(draft.serviceCharge)}
+        <GradientGoldText size="display">{formatCurrency(itemsTotal)}</GradientGoldText>
+
+        <View style={styles.shareFields}>
+          <BillField
+            label="Your name (host)"
+            value={hostName}
+            onChangeText={setHostName}
+            placeholder="e.g. Rahul"
+            inputRef={hostNameInputRef}
           />
-          <View style={styles.divider} />
-          <BreakdownRow
-            label="Grand total"
-            value={formatCurrency(displayGrandTotal)}
-            bold
+          <BillField
+            label="Your UPI ID (optional)"
+            value={hostUpiId}
+            onChangeText={setHostUpiId}
+            placeholder="you@ybl"
           />
         </View>
-      </Card>
 
-      {saveError ? <Text style={styles.errorText}>{saveError}</Text> : null}
-
-      <Card style={styles.shareCard}>
-        <Text style={styles.shareCardTitle}>Create room & share</Text>
-        <InputField
-          label="Your name (host)"
-          value={hostName}
-          onChangeText={setHostName}
-          placeholder="e.g. Rahul"
-        />
-        <InputField
-          label="Your UPI ID (optional)"
-          value={hostUpiId}
-          onChangeText={setHostUpiId}
-          placeholder="you@ybl"
-        />
         <Button
           label="Create room & share"
           fullWidth
@@ -378,12 +568,13 @@ export default function BillEditor({
           onPress={handleCreateRoom}
         />
         {roomError ? <Text style={styles.errorText}>{roomError}</Text> : null}
-      </Card>
+        {saveError ? <Text style={styles.saveWarn}>{saveError}</Text> : null}
+      </View>
 
       <View style={styles.actions}>
         <Button
           label="Scan another bill"
-          variant="secondary"
+          variant="ghost"
           fullWidth
           onPress={onScanAnother}
         />
@@ -392,27 +583,70 @@ export default function BillEditor({
   );
 }
 
+function BillField({
+  label,
+  value,
+  onChangeText,
+  placeholder,
+  inputRef,
+}: {
+  label: string;
+  value: string;
+  onChangeText: (v: string) => void;
+  placeholder?: string;
+  inputRef?: RefObject<TextInput | null>;
+}) {
+  return (
+    <View style={styles.billField}>
+      <Text style={styles.billLabel}>{label}</Text>
+      <TextInput
+        ref={inputRef}
+        style={styles.billInput}
+        value={value}
+        onChangeText={onChangeText}
+        placeholder={placeholder}
+        placeholderTextColor={colors.textMuted}
+        selectionColor={colors.gold}
+      />
+    </View>
+  );
+}
+
 function EditableItemRow({
   item,
   onChange,
   onDelete,
+  autoFocusName = false,
+  onNameFocused,
 }: {
   item: BillItem;
   onChange: (itemId: string, data: Partial<BillItem>) => void;
   onDelete: (itemId: string) => void;
+  autoFocusName?: boolean;
+  onNameFocused?: () => void;
 }) {
-  const [qtyText, setQtyText] = useState(String(item.quantity));
-  const [priceText, setPriceText] = useState(String(item.price));
+  const nameInputRef = useRef<TextInput>(null);
+  const [qtyText, setQtyText] = useState(
+    item.quantity > 0 ? String(item.quantity) : ""
+  );
+  const [priceText, setPriceText] = useState(
+    item.price > 0 ? String(item.price) : ""
+  );
   const priceFocusedRef = useRef(false);
-  const unitPrice = getLineUnitPrice(item);
 
   useEffect(() => {
-    setQtyText(String(item.quantity));
+    if (!autoFocusName) return;
+    nameInputRef.current?.focus();
+    onNameFocused?.();
+  }, [autoFocusName, onNameFocused]);
+
+  useEffect(() => {
+    setQtyText(item.quantity > 0 ? String(item.quantity) : "");
   }, [item.quantity]);
 
   useEffect(() => {
     if (!priceFocusedRef.current) {
-      setPriceText(String(item.price));
+      setPriceText(item.price > 0 ? String(item.price) : "");
     }
   }, [item.price]);
 
@@ -422,81 +656,103 @@ function EditableItemRow({
   }
 
   function commitQty(raw: string) {
-    const parsed = parseInt(raw, 10);
-    const quantity = Number.isFinite(parsed) && parsed >= 1 ? parsed : 1;
-    applyQuantity(quantity);
+    const trimmed = raw.trim();
+    if (!trimmed) {
+      setQtyText("");
+      return;
+    }
+    const parsed = parseInt(trimmed, 10);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      setQtyText(item.quantity > 0 ? String(item.quantity) : "");
+      return;
+    }
+    applyQuantity(parsed);
   }
 
   function commitPrice(raw: string) {
-    const parsed = parseFloat(raw);
-    const price = Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
-    setPriceText(String(price));
-    onChange(item.id, { price });
+    const trimmed = raw.trim();
+    if (!trimmed) {
+      setPriceText("");
+      onChange(item.id, { price: 0 });
+      return;
+    }
+    const parsed = parseFloat(trimmed);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      setPriceText(item.price > 0 ? String(item.price) : "");
+      return;
+    }
+    setPriceText(String(parsed));
+    onChange(item.id, { price: parsed });
   }
 
   return (
-    <Card style={styles.itemCard}>
-      <TextInput
-        style={styles.itemNameInput}
-        value={item.name}
-        onChangeText={(v) => onChange(item.id, { name: v })}
-        placeholder="Item name"
-        placeholderTextColor={colors.textMuted}
-      />
-
-      <View style={styles.itemFields}>
-        <View style={styles.itemFieldCol}>
-          <Text style={styles.itemFieldLabel}>Qty</Text>
+    <View style={styles.gridRow}>
+      <View style={styles.colItem}>
+        <TextInput
+          ref={nameInputRef}
+          style={styles.billInput}
+          value={item.name}
+          onChangeText={(v) => onChange(item.id, { name: v })}
+          placeholder="Item name"
+          placeholderTextColor={colors.textMuted}
+        />
+      </View>
+      <View style={styles.colQty}>
+        <TextInput
+          style={[styles.billInput, styles.qtyInput]}
+          value={qtyText}
+          keyboardType="number-pad"
+          placeholder="1"
+          placeholderTextColor={colors.textMuted}
+          onChangeText={(v) => {
+            if (v !== "" && !/^\d+$/.test(v)) return;
+            setQtyText(v);
+            if (v === "") return;
+            const parsed = parseInt(v, 10);
+            if (Number.isFinite(parsed) && parsed > 0) {
+              applyQuantity(parsed);
+            }
+          }}
+          onBlur={() => commitQty(qtyText)}
+        />
+      </View>
+      <View style={styles.colAmount}>
+        <View style={styles.priceRow}>
+          <Text style={styles.pricePrefix}>₹</Text>
           <TextInput
-            style={styles.itemFieldInput}
-            value={qtyText}
-            keyboardType="number-pad"
+            style={styles.itemPriceInput}
+            value={priceText}
+            keyboardType="decimal-pad"
+            placeholder="0.00"
+            placeholderTextColor={colors.textMuted}
+            onFocus={() => {
+              priceFocusedRef.current = true;
+            }}
             onChangeText={(v) => {
-              setQtyText(v);
-              const parsed = parseInt(v, 10);
-              if (Number.isFinite(parsed) && parsed >= 1) {
-                applyQuantity(parsed);
+              if (v !== "" && !/^\d*\.?\d*$/.test(v)) return;
+              setPriceText(v);
+              if (v === "" || v === ".") {
+                onChange(item.id, { price: 0 });
+                return;
+              }
+              const parsed = parseFloat(v);
+              if (Number.isFinite(parsed) && parsed > 0) {
+                onChange(item.id, { price: parsed });
               }
             }}
-            onBlur={() => commitQty(qtyText)}
+            onBlur={() => {
+              priceFocusedRef.current = false;
+              commitPrice(priceText);
+            }}
           />
         </View>
-
-        <View style={[styles.itemFieldCol, styles.itemFieldColWide]}>
-          <Text style={styles.itemFieldLabel}>Amount</Text>
-          <View style={styles.priceRow}>
-            <Text style={styles.pricePrefix}>₹</Text>
-            <TextInput
-              style={styles.itemFieldInput}
-              value={priceText}
-              keyboardType="decimal-pad"
-              onFocus={() => {
-                priceFocusedRef.current = true;
-              }}
-              onChangeText={(v) => {
-                setPriceText(v);
-                const parsed = parseFloat(v);
-                if (Number.isFinite(parsed) && parsed >= 0) {
-                  onChange(item.id, { price: parsed });
-                }
-              }}
-              onBlur={() => {
-                priceFocusedRef.current = false;
-                commitPrice(priceText);
-              }}
-            />
-          </View>
-        </View>
-
-        <Pressable onPress={() => onDelete(item.id)} style={styles.deleteBtn} hitSlop={8}>
+      </View>
+      <View style={styles.colAction}>
+        <Pressable onPress={() => onDelete(item.id)} hitSlop={8}>
           <Text style={styles.deleteText}>×</Text>
         </Pressable>
       </View>
-
-      <Text style={styles.unitPrice}>
-        {formatCurrency(unitPrice)} per unit
-      </Text>
-    </Card>
+    </View>
   );
 }
 
@@ -504,10 +760,12 @@ function NumberField({
   label,
   value,
   onChange,
+  highlight = false,
 }: {
   label: string;
   value: number;
   onChange: (v: number) => void;
+  highlight?: boolean;
 }) {
   const [text, setText] = useState(String(value));
 
@@ -516,45 +774,33 @@ function NumberField({
   }, [value]);
 
   return (
-    <InputField
-      label={label}
-      value={text}
-      prefix="₹"
-      keyboardType="decimal-pad"
-      onChangeText={(v) => {
-        setText(v);
-        const parsed = parseFloat(v);
-        if (Number.isFinite(parsed) && parsed >= 0) {
-          onChange(parsed);
-        }
-      }}
-      onBlur={() => {
-        const parsed = parseFloat(text);
-        const final = Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
-        setText(String(final));
-        onChange(final);
-      }}
-    />
-  );
-}
-
-function BreakdownRow({
-  label,
-  value,
-  bold = false,
-}: {
-  label: string;
-  value: string;
-  bold?: boolean;
-}) {
-  return (
-    <View style={styles.breakdownRow}>
-      <Text style={[styles.breakdownLabel, bold && styles.breakdownBold]}>
+    <View style={[styles.billField, styles.totalsField]}>
+      <Text style={[styles.billLabel, highlight && styles.billLabelHighlight]}>
         {label}
       </Text>
-      <Text style={[styles.breakdownValue, bold && styles.breakdownBold]}>
-        {value}
-      </Text>
+      <View style={[styles.numberInputRow, highlight && styles.numberInputHighlight]}>
+        <Text style={[styles.pricePrefix, highlight && styles.pricePrefixGold]}>₹</Text>
+        <TextInput
+          style={[styles.numberInput, highlight && styles.numberInputTextHighlight]}
+          value={text}
+          keyboardType="decimal-pad"
+          onChangeText={(v) => {
+            setText(v);
+            const parsed = parseFloat(v);
+            if (Number.isFinite(parsed) && parsed >= 0) {
+              onChange(parsed);
+            }
+          }}
+          onBlur={() => {
+            const parsed = parseFloat(text);
+            const final = Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
+            setText(String(final));
+            onChange(final);
+          }}
+          placeholderTextColor={colors.textMuted}
+          selectionColor={colors.gold}
+        />
+      </View>
     </View>
   );
 }
@@ -568,243 +814,234 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xl,
     gap: spacing.sm,
   },
-  headerTop: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    gap: spacing.md,
-  },
-  headerText: {
-    flex: 1,
-    gap: spacing.sm,
-  },
-  title: {
-    marginTop: spacing.xs,
-  },
   subtitle: {
-    color: colors.textPrimary,
-    fontSize: fontSize.lg,
-    lineHeight: 26,
+    color: colors.textSecondary,
+    fontSize: fontSize.md,
+    lineHeight: 22,
     fontWeight: "500",
-    marginTop: spacing.sm,
-  },
-  parsedBadge: {
-    backgroundColor: colors.successMutedStrong,
-    borderRadius: radius.pill,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    marginTop: spacing.lg,
-  },
-  parsedBadgeText: {
-    color: colors.success,
-    fontSize: fontSize.xs,
-    fontWeight: "600",
   },
   savingText: {
     color: colors.textMuted,
     fontSize: fontSize.xs,
   },
-  field: {
-    marginBottom: spacing.md,
+  billCard: {
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    overflow: "hidden",
+    marginBottom: spacing.xl,
+  },
+  metaGrid: {
+    padding: spacing.lg,
+    gap: spacing.md,
+  },
+  billField: {
+    gap: spacing.xs,
+    flex: 1,
+  },
+  billLabel: {
+    color: colors.goldTextMuted,
+    fontSize: fontSize.xs,
+    fontWeight: "500",
+    textTransform: "uppercase",
+    letterSpacing: 1,
+  },
+  billLabelHighlight: {
+    color: colors.gold,
+    fontWeight: "600",
+  },
+  billInput: {
+    color: colors.textPrimary,
+    fontSize: fontSize.sm,
+    backgroundColor: "transparent",
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    minHeight: 40,
   },
   sectionHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginTop: spacing.lg,
-    marginBottom: spacing.md,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
   sectionTitle: {
     color: colors.textPrimary,
-    fontSize: fontSize.lg,
+    fontSize: fontSize.md,
     fontWeight: "600",
   },
   addLink: {
-    color: colors.gold,
+    color: colors.goldLight,
     fontSize: fontSize.sm,
     fontWeight: "600",
   },
-  itemList: {
-    gap: spacing.md,
+  addPlus: {
+    fontSize: fontSize.md,
   },
-  itemColumnHeader: {
+  gridRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: spacing.sm,
-    paddingHorizontal: spacing.xs,
-    marginBottom: spacing.xs,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  gridRowHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  colItem: {
+    flex: 6,
+    minWidth: 0,
+    paddingRight: spacing.xs,
+  },
+  colQty: {
+    flex: 2,
+    minWidth: 0,
+    paddingRight: spacing.xs,
+  },
+  colAmount: {
+    flex: 3,
+    minWidth: 0,
+    paddingRight: spacing.xs,
+  },
+  colAction: {
+    width: 28,
+    alignItems: "center",
+    justifyContent: "center",
   },
   itemColumnHeaderText: {
-    color: colors.textMuted,
+    color: colors.goldTextMuted,
     fontSize: fontSize.xs,
     textTransform: "uppercase",
     letterSpacing: 1,
+    fontWeight: "500",
   },
-  itemColumnItem: {
+  itemList: {
+    borderTopWidth: 0,
+  },
+  qtyInput: {
+    textAlign: "center",
+  },
+  itemPriceInput: {
     flex: 1,
-  },
-  itemColumnQty: {
-    width: 72,
-  },
-  itemColumnAmount: {
-    flex: 2,
-  },
-  itemCard: {
-    gap: spacing.sm,
-  },
-  itemNameInput: {
     color: colors.textPrimary,
-    fontSize: fontSize.md,
-    fontWeight: "600",
-    backgroundColor: colors.surfaceElevated,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.md,
+    fontSize: fontSize.sm,
     paddingVertical: spacing.sm,
-    minHeight: 44,
-  },
-  itemFields: {
-    flexDirection: "row",
-    alignItems: "flex-end",
-    gap: spacing.sm,
-  },
-  itemFieldCol: {
-    flex: 1,
-    gap: spacing.xs,
-  },
-  itemFieldColWide: {
-    flex: 2,
-  },
-  itemFieldLabel: {
-    color: colors.textMuted,
-    fontSize: fontSize.xs,
-    textTransform: "uppercase",
-    letterSpacing: 1,
-  },
-  itemFieldInput: {
-    color: colors.textPrimary,
-    fontSize: fontSize.md,
-    backgroundColor: colors.surfaceElevated,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    minHeight: 44,
+    minHeight: 0,
   },
   priceRow: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: colors.surfaceElevated,
     borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    paddingLeft: spacing.md,
-    minHeight: 44,
+    borderColor: colors.borderStrong,
+    borderRadius: radius.sm,
+    paddingLeft: spacing.sm,
+    paddingRight: spacing.xs,
+    minHeight: 40,
+    width: "100%",
   },
   pricePrefix: {
-    color: colors.textMuted,
-    fontSize: fontSize.md,
+    color: colors.textPrimary,
+    fontSize: fontSize.sm,
+    fontWeight: "500",
   },
-  deleteBtn: {
-    width: 44,
-    height: 44,
-    alignItems: "center",
-    justifyContent: "center",
+  pricePrefixGold: {
+    color: colors.gold,
   },
   deleteText: {
     color: colors.textMuted,
-    fontSize: 28,
-    lineHeight: 30,
-  },
-  unitPrice: {
-    color: colors.textMuted,
-    fontSize: fontSize.xs,
+    fontSize: 22,
+    lineHeight: 24,
+    textAlign: "center",
   },
   totalsCard: {
-    marginTop: spacing.xl,
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: spacing.md,
-  },
-  itemsTotalCard: {
-    marginTop: spacing.xl,
-    backgroundColor: colors.surfaceElevated,
+    borderRadius: radius.lg,
+    borderWidth: 1,
     borderColor: colors.border,
-    gap: spacing.sm,
+    padding: spacing.lg,
+    marginBottom: spacing.xl,
+  },
+  totalsField: {
+    flexGrow: 1,
+    flexBasis: "46%",
+    minWidth: 140,
+  },
+  numberInputRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    minHeight: 44,
+    backgroundColor: "transparent",
+  },
+  numberInputHighlight: {
+    borderColor: colors.borderStrong,
+  },
+  numberInput: {
+    flex: 1,
+    color: colors.textPrimary,
+    fontSize: fontSize.sm,
+    paddingVertical: spacing.sm,
+  },
+  numberInputTextHighlight: {
+    fontWeight: "600",
+    color: colors.goldLight,
+  },
+  premiumCard: {
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.goldBorder,
+    backgroundColor: colors.goldMuted,
+    padding: spacing.lg,
+    gap: spacing.md,
+    marginBottom: spacing.lg,
   },
   itemsTotalLabel: {
     color: colors.textPrimary,
-    fontSize: fontSize.sm,
+    fontSize: fontSize.xs,
     textTransform: "uppercase",
     letterSpacing: 1,
-  },
-  itemsTotalValue: {
-    color: colors.goldLight,
-    fontSize: fontSize.xxl,
-    fontWeight: "700",
-    textShadowColor: "rgba(217, 119, 6, 0.35)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
-  },
-  breakdown: {
-    marginTop: spacing.md,
-    gap: spacing.sm,
-  },
-  breakdownRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  breakdownLabel: {
-    color: colors.textSecondary,
-    fontSize: fontSize.sm,
-  },
-  breakdownValue: {
-    color: colors.textPrimary,
-    fontSize: fontSize.sm,
     fontWeight: "600",
   },
-  breakdownBold: {
-    color: colors.textPrimary,
-    fontSize: fontSize.md,
-    fontWeight: "700",
-  },
-  divider: {
-    height: 1,
-    backgroundColor: colors.border,
-    marginVertical: spacing.xs,
+  shareFields: {
+    gap: spacing.md,
+    marginTop: spacing.sm,
   },
   emptyText: {
-    color: colors.textSecondary,
+    color: colors.textMuted,
     fontSize: fontSize.sm,
     lineHeight: 20,
     textAlign: "center",
+    paddingVertical: spacing.xl,
+    paddingHorizontal: spacing.lg,
   },
   errorText: {
     color: colors.danger,
     fontSize: fontSize.sm,
-    marginTop: spacing.md,
+    textAlign: "center",
+  },
+  saveWarn: {
+    color: colors.gold,
+    fontSize: fontSize.sm,
     textAlign: "center",
   },
   actions: {
-    gap: spacing.sm,
-    marginTop: spacing.lg,
-  },
-  shareCard: {
-    marginTop: spacing.xl,
-    gap: spacing.md,
-    backgroundColor: colors.surfaceElevated,
-    borderColor: colors.border,
-  },
-  shareCardTitle: {
-    color: colors.textPrimary,
-    fontSize: fontSize.md,
-    fontWeight: "600",
-  },
-  hintText: {
-    color: colors.textMuted,
-    fontSize: fontSize.xs,
-    lineHeight: 18,
-    textAlign: "center",
+    marginTop: spacing.sm,
   },
 });

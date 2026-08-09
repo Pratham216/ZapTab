@@ -1,4 +1,4 @@
-import { isValidUpiId, normalizeUpiId } from "@splitsnap/shared";
+import { isValidUpiId, normalizeUpiId } from "@zaptab/shared";
 import type { IRoom } from "../models/Room";
 import { Participant } from "../models/Participant";
 import { getRoomByCode } from "./roomService";

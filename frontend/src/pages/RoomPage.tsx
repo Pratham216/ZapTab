@@ -7,6 +7,7 @@ import { useSocket } from "../hooks/useSocket";
 import QRDisplay from "../components/QRDisplay";
 import HostUpiCard from "../components/HostUpiCard";
 import PaymentPanel from "../components/PaymentPanel";
+import UserAvatar from "../components/UserAvatar";
 import ItemSelectionList, {
   applySelectionChange,
 } from "../components/ItemSelectionList";
@@ -191,11 +192,9 @@ export default function RoomPage() {
               return (
               <li
                 key={p.id}
-                className="flex items-center gap-2 text-sm rounded-xl px-3 py-2.5"
+                className="flex items-center gap-2 text-sm rounded-xl px-3 py-2.5 bg-neutral-900/50"
               >
-                <span className="w-8 h-8 rounded-full bg-neutral-800 text-neutral-100 flex items-center justify-center font-medium">
-                  {p.name.charAt(0).toUpperCase()}
-                </span>
+                <UserAvatar name={p.name} size="xs" />
                 <span className="flex-1 min-w-0 truncate">{p.name}</span>
                 <div className="flex items-center gap-2 shrink-0">
                   {!isRoomHost && share && share.total > 0 && (

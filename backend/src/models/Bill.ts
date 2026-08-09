@@ -1,5 +1,5 @@
 import mongoose, { Schema, Types } from "mongoose";
-import type { BillStatus } from "@splitsnap/shared";
+import type { BillStatus } from "@zaptab/shared";
 
 export interface IBillItem extends Types.Subdocument {
   _id: Types.ObjectId;

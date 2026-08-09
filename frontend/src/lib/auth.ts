@@ -1,7 +1,7 @@
-const TOKEN_KEY = "splitsnap_token";
-const GUEST_ID_KEY = "splitsnap_guest_id";
-const USER_TOKEN_KEY = "splitsnap_user_token";
-const USER_GUEST_ID_KEY = "splitsnap_user_guest_id";
+const TOKEN_KEY = "zaptab_token";
+const GUEST_ID_KEY = "zaptab_guest_id";
+const USER_TOKEN_KEY = "zaptab_user_token";
+const USER_GUEST_ID_KEY = "zaptab_user_guest_id";
 
 function guestStorage(): Storage {
   return sessionStorage;

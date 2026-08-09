@@ -1,5 +1,5 @@
 {
-  "name": "splitsnap",
+  "name": "zaptab",
   "private": true,
   "scripts": {
     "free-port": "node scripts/free-port.mjs 3001",

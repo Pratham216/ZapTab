@@ -1,5 +1,5 @@
-import { calculatePersonShare } from "@splitsnap/shared";
-import { buildUpiIntentUrl, isValidUpiId } from "@splitsnap/shared";
+import { calculatePersonShare } from "@zaptab/shared";
+import { buildUpiIntentUrl, isValidUpiId } from "@zaptab/shared";
 import type { Bill } from "../api/bills";
 import type { Room } from "../api/rooms";
 
@@ -45,7 +45,7 @@ export function buildPaymentUpiUrl(room: Room, amount: number): string | null {
     upiId: room.hostUpiId,
     payeeName: getHostName(room),
     amount,
-    note: `SplitSnap ${room.code}`,
+    note: `ZapTab ${room.code}`,
   });
 }
 

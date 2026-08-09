@@ -58,7 +58,7 @@ async function main() {
   initSocket(httpServer);
 
   httpServer.listen(config.port, "0.0.0.0", () => {
-    console.log(`SplitSnap API running on http://localhost:${config.port}`);
+    console.log(`ZapTab API running on http://localhost:${config.port}`);
     logNetworkInfo();
     console.log(
       `Bill parser: ${config.parserMode}` +

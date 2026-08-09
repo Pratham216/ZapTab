@@ -9,7 +9,7 @@
     "allowImportingTsExtensions": true,
     "baseUrl": ".",
     "paths": {
-      "@splitsnap/shared": ["../shared/src/index.ts"]
+      "@zaptab/shared": ["../shared/src/index.ts"]
     },
     "isolatedModules": true,
     "moduleDetection": "force",

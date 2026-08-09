@@ -10,7 +10,7 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
-      "@splitsnap/shared": path.resolve(rootDir, "../shared/src/index.ts"),
+      "@zaptab/shared": path.resolve(rootDir, "../shared/src/index.ts"),
     },
   },
   server: {

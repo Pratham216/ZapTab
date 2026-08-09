@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { isValidUpiId } from "@splitsnap/shared";
+import { isValidUpiId } from "@zaptab/shared";
 import { updateHostUpi } from "../api/rooms";
 
 interface HostUpiCardProps {

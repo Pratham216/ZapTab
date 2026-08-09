@@ -1,6 +1,6 @@
 import fs from "fs/promises";
 import path from "path";
-import { ParsedBillSchema } from "@splitsnap/shared";
+import { ParsedBillSchema } from "@zaptab/shared";
 import {
   config,
   getActiveVisionModel,
@@ -77,7 +77,7 @@ async function callOpenRouterVision(dataUrl: string, model: string) {
       Authorization: `Bearer ${config.openRouterApiKey}`,
       "Content-Type": "application/json",
       "HTTP-Referer": config.appUrl || "http://localhost:5173",
-      "X-Title": "SplitSnap",
+      "X-Title": "ZapTab",
     },
     body: JSON.stringify({
       model,

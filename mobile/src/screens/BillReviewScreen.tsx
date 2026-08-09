@@ -5,6 +5,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import ScreenContainer from "../components/ScreenContainer";
 import Button from "../components/Button";
@@ -16,17 +17,39 @@ import {
   retryBill,
   type Bill,
 } from "../api/bills";
+import { getBillDisplayTotal } from "../lib/billTotals";
+import { saveReceipt, saveRoom } from "../lib/history";
 import { colors, fontSize, radius, spacing, typography } from "../theme";
 import type { RootStackParamList } from "../navigation/AppNavigator";
+import { useAuth } from "../contexts/AuthContext";
 
 type Props = NativeStackScreenProps<RootStackParamList, "BillReview">;
 
+async function persistReceiptFromBill(bill: Bill, roomCode?: string) {
+  await saveReceipt({
+    billId: bill.id,
+    restaurantName: bill.restaurantName,
+    total: getBillDisplayTotal(bill),
+    roomCode,
+  });
+}
+
 export default function BillReviewScreen({ navigation, route }: Props) {
-  const { billId } = route.params;
+  const { billId, focusSplit } = route.params;
+  const { user } = useAuth();
   const [bill, setBill] = useState<Bill | null>(null);
   const [status, setStatus] = useState<Bill["status"]>("processing");
   const [error, setError] = useState<string | null>(null);
   const [retrying, setRetrying] = useState(false);
+  const [roomCode, setRoomCode] = useState<string | undefined>();
+
+  const handleBillChange = useCallback(
+    async (next: Bill) => {
+      setBill(next);
+      await persistReceiptFromBill(next, roomCode);
+    },
+    [roomCode]
+  );
 
   const loadBill = useCallback(async () => {
     const data = await getBill(billId);
@@ -39,6 +62,8 @@ export default function BillReviewScreen({ navigation, route }: Props) {
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
 
+    let delayMs = 1500;
+
     async function poll() {
       try {
         const next = await getBillStatus(billId);
@@ -48,11 +73,18 @@ export default function BillReviewScreen({ navigation, route }: Props) {
         setError(next.errorMessage ?? null);
 
         if (next.status === "parsed" || next.status === "failed") {
-          await loadBill();
+          const data = await getBill(billId);
+          if (!cancelled) {
+            setBill(data);
+            if (data.status === "parsed") {
+              await persistReceiptFromBill(data);
+            }
+          }
           return;
         }
 
-        timer = setTimeout(poll, 1500);
+        timer = setTimeout(poll, delayMs);
+        delayMs = Math.min(delayMs * 1.5, 10000);
       } catch (err) {
         if (!cancelled) {
           setError(err instanceof Error ? err.message : "Failed to load bill");
@@ -67,6 +99,13 @@ export default function BillReviewScreen({ navigation, route }: Props) {
       if (timer) clearTimeout(timer);
     };
   }, [billId, loadBill]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (status !== "parsed") return;
+      void loadBill();
+    }, [loadBill, status])
+  );
 
   async function handleRetry() {
     setRetrying(true);
@@ -117,7 +156,7 @@ export default function BillReviewScreen({ navigation, route }: Props) {
           onPress={handleRetry}
           style={styles.centerButton}
         />
-        <Button label="Scan another" variant="ghost" onPress={() => navigation.popToTop()} />
+        <Button label="Scan another" variant="ghost" onPress={() => navigation.navigate("Main")} />
       </ScreenContainer>
     );
   }
@@ -134,8 +173,23 @@ export default function BillReviewScreen({ navigation, route }: Props) {
     <BillEditor
       key={bill.id}
       initialBill={bill}
-      onScanAnother={() => navigation.popToTop()}
-      onRoomCreated={(code) => navigation.replace("Room", { code })}
+      focusSplit={focusSplit}
+      defaultHostName={user?.name}
+      defaultHostUpiId={user?.upiId}
+      onBillChange={handleBillChange}
+      onScanAnother={() => navigation.navigate("Main")}
+      onRoomCreated={async (code) => {
+        setRoomCode(code);
+        const latest = await getBill(billId);
+        setBill(latest);
+        await persistReceiptFromBill(latest, code);
+        await saveRoom({
+          code,
+          role: "host",
+          restaurantName: latest.restaurantName,
+        });
+        navigation.replace("Room", { code });
+      }}
     />
   );
 }

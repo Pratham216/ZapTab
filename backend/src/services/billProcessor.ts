@@ -4,7 +4,7 @@ import { saveOcrDebug } from "./ocrDebug";
 import { parseBillFromOcr, parseBillLocal } from "./parser";
 import { isVisionSupportedImage, parseBillFromImage } from "./visionParser";
 import { config, isVisionConfigured } from "../config";
-import type { ParsedBill } from "@splitsnap/shared";
+import type { ParsedBill } from "@zaptab/shared";
 
 function applyParsedBill(bill: IBill, parsed: ParsedBill, ocrText?: string) {
   bill.restaurantName = parsed.restaurantName;

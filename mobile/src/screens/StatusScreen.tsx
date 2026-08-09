@@ -15,7 +15,7 @@ function truncateId(id: string): string {
 type Props = NativeStackScreenProps<RootStackParamList, "Status">;
 
 export default function StatusScreen({ navigation }: Props) {
-  const { session, apiUrl, backendOk, resetSession } = useAuth();
+  const { session, apiUrl, backendOk, refresh } = useAuth();
 
   return (
     <ScreenContainer scroll>
@@ -34,10 +34,10 @@ export default function StatusScreen({ navigation }: Props) {
 
       <View style={styles.actions}>
         <Button
-          label="New guest session"
+          label="Refresh session"
           variant="secondary"
           fullWidth
-          onPress={resetSession}
+          onPress={() => void refresh()}
         />
         <Button
           label="Back"

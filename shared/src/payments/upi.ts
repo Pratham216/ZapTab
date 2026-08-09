@@ -21,7 +21,7 @@ export function buildUpiIntentUrl(params: {
   const pa = encodeURIComponent(normalizeUpiId(params.upiId));
   const pn = encodeURIComponent(params.payeeName.trim().slice(0, 50));
   const am = params.amount.toFixed(2);
-  const tn = encodeURIComponent((params.note ?? "SplitSnap").trim().slice(0, 50));
+  const tn = encodeURIComponent((params.note ?? "ZapTab").trim().slice(0, 50));
 
   return `upi://pay?pa=${pa}&pn=${pn}&am=${am}&cu=INR&tn=${tn}`;
 }
