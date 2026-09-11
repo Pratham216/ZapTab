@@ -11,6 +11,11 @@ export default function ScanPage() {
   const [dragOver, setDragOver] = useState(false);
 
   async function handleFile(file: File) {
+    if (!file.type.startsWith("image/") && !/\.(jpe?g|png|webp)$/i.test(file.name)) {
+      setError("Please upload an image (JPG, PNG, or WEBP). PDFs are not supported.");
+      return;
+    }
+
     setError(null);
     setUploading(true);
     trackEvent("receipt_scan_started", { fileName: file.name, fileSize: file.size });
@@ -30,6 +35,7 @@ export default function ScanPage() {
   function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (file) handleFile(file);
+    e.target.value = "";
   }
 
   function onDrop(e: React.DragEvent) {
@@ -98,7 +104,7 @@ export default function ScanPage() {
         <input
           ref={fileInputRef}
           type="file"
-          accept="image/jpeg,image/png,image/jpg,.pdf"
+          accept="image/jpeg,image/png,image/webp"
           capture="environment"
           className="hidden"
           onChange={onFileChange}

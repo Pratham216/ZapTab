@@ -4,6 +4,7 @@ import { ParsedBillSchema } from "@zaptab/shared";
 import {
   config,
   getActiveVisionModel,
+  getModelTag,
   isVisionConfigured,
 } from "../config";
 
@@ -76,10 +77,35 @@ export function isVisionSupportedImage(filePath: string): boolean {
 }
 
 function parseJsonFromModelContent(content: string) {
-  const trimmed = content.trim();
-  const fenceMatch = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/);
-  const jsonText = fenceMatch ? fenceMatch[1].trim() : trimmed;
-  return JSON.parse(jsonText);
+  // Strip <think>...</think> reasoning blocks if produced by reasoning models
+  const cleaned = content.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
+
+  // 1. Try markdown code fence
+  const fenceMatch = cleaned.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (fenceMatch) {
+    try {
+      return JSON.parse(fenceMatch[1].trim());
+    } catch {
+      // Fall through to brace extraction
+    }
+  }
+
+  // 2. Try direct JSON.parse
+  try {
+    return JSON.parse(cleaned);
+  } catch {
+    // 3. Extract outermost { ... } in case model output contains markdown preamble/postamble
+    const firstBrace = cleaned.indexOf("{");
+    const lastBrace = cleaned.lastIndexOf("}");
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+      const extracted = cleaned.slice(firstBrace, lastBrace + 1);
+      return JSON.parse(extracted);
+    }
+  }
+
+  throw new Error(
+    `Model output did not contain valid JSON: ${cleaned.slice(0, 150)}`
+  );
 }
 
 async function readImageDataUrl(imagePath: string) {
@@ -107,6 +133,11 @@ async function callOpenRouterVision(dataUrl: string, model: string) {
       model,
       max_tokens: config.openRouterMaxTokens,
       messages: [
+        {
+          role: "system",
+          content:
+            "You are a precision restaurant bill parser. Output ONLY valid JSON starting with { and ending with }. Do not include markdown bolding, conversational text, or explanations.",
+        },
         {
           role: "user",
           content: [
@@ -143,6 +174,11 @@ async function callNvidiaVision(dataUrl: string, model: string) {
       temperature: 0.1,
       stream: false,
       messages: [
+        {
+          role: "system",
+          content:
+            "You are a precision restaurant bill parser. Output ONLY valid JSON starting with { and ending with }. Do not include markdown bolding, conversational text, or explanations.",
+        },
         {
           role: "user",
           content: [
@@ -199,10 +235,18 @@ export async function parseBillFromImage(imagePath: string) {
   const dataUrl = await readImageDataUrl(imagePath);
   const model = getActiveVisionModel();
 
+  console.log(
+    `[VisionParser] ⏱️ Sending receipt image to ${getModelTag()}...`
+  );
+  const startTime = Date.now();
+
   const data =
     config.visionProvider === "nvidia"
       ? await callNvidiaVision(dataUrl, model)
       : await callOpenRouterVision(dataUrl, model);
+
+  const durationMs = Date.now() - startTime;
+  const durationSec = (durationMs / 1000).toFixed(2);
 
   const content = data.choices?.[0]?.message?.content;
   if (!content) {
@@ -213,7 +257,7 @@ export async function parseBillFromImage(imagePath: string) {
   const parsed = ParsedBillSchema.parse(json);
   sanitizeRestaurantName(parsed);
   console.log(
-    `Vision parse OK (${config.visionProvider}/${model}): ${parsed.items.length} items`
+    `Vision parse OK (${getModelTag()}): ${parsed.items.length} items extracted in ⏱️ ${durationSec}s (${durationMs}ms)`
   );
   for (const item of parsed.items) {
     console.log(

@@ -5,30 +5,35 @@ const SIZE_CLASSES: Record<
   { ring: string; inner: string; text: string }
 > = {
   xs: {
-    ring: "p-px border",
+    ring: "p-0.5",
     inner: "w-6 h-6",
     text: "text-[10px]",
   },
   sm: {
-    ring: "p-0.5 border-2",
+    ring: "p-0.5",
     inner: "w-8 h-8",
-    text: "text-sm",
+    text: "text-xs font-semibold",
   },
   md: {
-    ring: "p-0.5 border-2",
-    inner: "w-11 h-11",
-    text: "text-lg",
+    ring: "p-0.5",
+    inner: "w-10 h-10",
+    text: "text-sm font-bold",
   },
   lg: {
-    ring: "p-[3px] border-2",
-    inner: "w-[72px] h-[72px]",
-    text: "text-2xl",
+    ring: "p-1",
+    inner: "w-14 h-14",
+    text: "text-lg font-bold",
   },
 };
 
-export function getNameInitial(name: string): string {
-  return (name.trim().charAt(0) || "?").toUpperCase();
+export function getNameInitials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
+
+export const getNameInitial = getNameInitials;
 
 interface UserAvatarProps {
   name: string;
@@ -42,18 +47,20 @@ export default function UserAvatar({
   className = "",
 }: UserAvatarProps) {
   const spec = SIZE_CLASSES[size];
-  const initial = getNameInitial(name);
+  const initials = getNameInitials(name);
 
   return (
     <div
-      className={`shrink-0 rounded-full border-amber-500 ${spec.ring} ${className}`}
+      className={`shrink-0 rounded-full bg-gradient-to-b from-neutral-800 to-black p-[1.5px] border border-amber-500/50 ring-1 ring-amber-400/20 shadow-[0_0_10px_rgba(245,158,11,0.18)] ${className}`}
       aria-hidden
     >
       <div
-        className={`${spec.inner} rounded-full bg-amber-500/15 flex items-center justify-center`}
+        className={`${spec.inner} rounded-full bg-gradient-to-b from-neutral-900 to-black border border-neutral-800 flex items-center justify-center`}
       >
-        <span className={`text-amber-400 font-bold ${spec.text}`}>
-          {initial}
+        <span
+          className={`bg-gradient-to-b from-amber-200 via-amber-400 to-amber-500 bg-clip-text text-transparent tracking-wider font-extrabold ${spec.text}`}
+        >
+          {initials}
         </span>
       </div>
     </div>

@@ -21,7 +21,8 @@ export const config = {
   visionProvider: (process.env.VISION_PROVIDER ?? "openrouter") as VisionProvider,
   nvidiaApiKey: process.env.NVIDIA_API_KEY ?? "",
   nvidiaVisionModel:
-    process.env.NVIDIA_VISION_MODEL ?? "nvidia/nemotron-nano-12b-v2-vl",
+    process.env.NVIDIA_VISION_MODEL ??
+    "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",
   tempDir: process.env.TEMP_DIR ?? "temp/uploads",
   ocrDebugDir: process.env.OCR_DEBUG_DIR ?? "temp/ocr-debug",
   tempFileTtlMs: parseInt(process.env.TEMP_FILE_TTL_MS ?? "1800000", 10),
@@ -43,7 +44,17 @@ export function isVisionConfigured(): boolean {
 
 export function getActiveVisionModel(): string {
   if (config.visionProvider === "nvidia") {
-    return config.nvidiaVisionModel;
+    return process.env.NVIDIA_VISION_MODEL?.trim() || config.nvidiaVisionModel;
   }
-  return config.openRouterVisionModel;
+  return (
+    process.env.OPENROUTER_VISION_MODEL?.trim() || config.openRouterVisionModel
+  );
+}
+
+export function getModelTag(): string {
+  const model = getActiveVisionModel();
+  if (model.includes("/")) {
+    return model;
+  }
+  return `${config.visionProvider}/${model}`;
 }

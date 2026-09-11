@@ -43,11 +43,27 @@ export async function findOrCreateUserFromClerk(input: {
   email: string;
   name: string;
 }) {
+  const normalizedEmail = input.email ? normalizeEmail(input.email) : "";
+
+  // 1. Try finding user by clerkId
   let user = await User.findOne({ clerkId: input.clerkId });
+
+  // 2. If not found by clerkId, search by email to link existing local or previous OAuth account
+  if (!user && normalizedEmail) {
+    user = await User.findOne({ email: normalizedEmail });
+    if (user) {
+      user.clerkId = input.clerkId;
+    }
+  }
+
   if (user) {
     let changed = false;
-    if (input.email && user.email !== input.email) {
-      user.email = input.email;
+    if (user.clerkId !== input.clerkId) {
+      user.clerkId = input.clerkId;
+      changed = true;
+    }
+    if (normalizedEmail && user.email !== normalizedEmail) {
+      user.email = normalizedEmail;
       changed = true;
     }
     if (input.name && user.name !== input.name) {
@@ -58,14 +74,28 @@ export async function findOrCreateUserFromClerk(input: {
     return user;
   }
 
-  user = await User.create({
-    clerkId: input.clerkId,
-    email: input.email,
-    name: input.name || "Host",
-    participantGuestId: uuidv4(),
-  });
-
-  return user;
+  // 3. User does not exist, create a new record
+  try {
+    user = await User.create({
+      clerkId: input.clerkId,
+      email: normalizedEmail,
+      name: input.name || "Host",
+      participantGuestId: uuidv4(),
+    });
+    return user;
+  } catch (err: unknown) {
+    // If a duplicate email collision occurred concurrently or with existing record, link it
+    if (normalizedEmail && (err as { code?: number })?.code === 11000) {
+      const existing = await User.findOne({ email: normalizedEmail });
+      if (existing) {
+        existing.clerkId = input.clerkId;
+        if (input.name && existing.name !== input.name) existing.name = input.name;
+        await existing.save();
+        return existing;
+      }
+    }
+    throw err;
+  }
 }
 
 export async function registerUserWithPassword(input: {

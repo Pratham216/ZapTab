@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   getBill,
@@ -127,15 +127,24 @@ function FailedState({
   onRetry: () => void;
 }) {
   return (
-    <div className="rounded-xl bg-red-500/10 border border-red-500/30 p-6 text-center space-y-4">
+    <div className="rounded-xl bg-red-500/10 border border-red-500/30 p-6 text-center space-y-4 max-w-md mx-auto">
       <h2 className="text-lg font-semibold text-red-300">Processing failed</h2>
       <p className="text-sm text-red-200/80">{message || "Something went wrong."}</p>
-      <button
-        onClick={onRetry}
-        className="px-4 py-2 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-200 text-sm"
-      >
-        Retry
-      </button>
+      <div className="flex items-center justify-center gap-3 pt-2">
+        <button
+          type="button"
+          onClick={onRetry}
+          className="px-4 py-2 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-200 text-sm font-medium transition-colors cursor-pointer"
+        >
+          Retry
+        </button>
+        <Link
+          to="/app"
+          className="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-200 text-sm font-medium border border-neutral-700 hover:border-neutral-600 transition-colors cursor-pointer"
+        >
+          Back to Home
+        </Link>
+      </div>
     </div>
   );
 }

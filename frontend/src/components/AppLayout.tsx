@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { UserButton } from "@clerk/clerk-react";
+import UserMenu from "./UserMenu";
 import ZapTabWordmark from "./ZapTabWordmark";
 
 interface AppLayoutProps {
@@ -24,14 +24,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
               </p>
             </div>
           </Link>
-          <UserButton
-            afterSignOutUrl="/"
-            appearance={{
-              elements: {
-                avatarBox: "w-9 h-9",
-              },
-            }}
-          />
+          <UserMenu />
         </div>
       </header>
 
