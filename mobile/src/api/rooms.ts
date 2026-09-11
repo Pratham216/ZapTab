@@ -1,4 +1,4 @@
-import type { SelectionsMap } from "@splitsnap/shared";
+import type { SelectionsMap } from "@zaptab/shared";
 import { apiRequest } from "../lib/api";
 import type { Bill } from "./bills";
 

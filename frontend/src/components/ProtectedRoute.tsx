@@ -34,7 +34,7 @@ export default function ProtectedRoute({
   }
 
   if (!isSignedIn) {
-    return <Navigate to="/" state={{ from: location.pathname }} replace />;
+    return <Navigate to="/sign-in" state={{ from: location.pathname }} replace />;
   }
 
   if (isLoading && isUserSession()) {

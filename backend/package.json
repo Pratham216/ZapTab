@@ -9,7 +9,8 @@
   },
   "dependencies": {
     "@clerk/backend": "^3.8.2",
-    "@splitsnap/shared": "workspace:*",
+    "@zaptab/shared": "workspace:*",
+    "bcryptjs": "^3.0.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
@@ -21,6 +22,7 @@
     "uuid": "^11.1.0"
   },
   "devDependencies": {
+    "@types/bcryptjs": "^3.0.0",
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.0",
     "@types/jsonwebtoken": "^9.0.10",

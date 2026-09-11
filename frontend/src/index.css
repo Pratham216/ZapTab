@@ -61,41 +61,41 @@ html {
 }
 
 @layer components {
-  .split-wordmark {
+  .zaptab-wordmark {
     @apply inline-flex items-baseline font-extrabold tracking-tight leading-none;
     font-family: var(--font-sans);
   }
 
-  .split-wordmark--sm {
+  .zaptab-wordmark--sm {
     font-size: 1.125rem;
   }
 
-  .split-wordmark--md {
+  .zaptab-wordmark--md {
     font-size: 1.25rem;
   }
 
-  .split-wordmark--lg {
+  .zaptab-wordmark--lg {
     font-size: 1.5rem;
   }
 
-  .split-wordmark--xl {
+  .zaptab-wordmark--xl {
     font-size: 1.875rem;
   }
 
-  .split-wordmark--hero {
+  .zaptab-wordmark--hero {
     font-size: clamp(2.5rem, 6vw, 4.5rem);
     letter-spacing: -0.02em;
   }
 
-  .split-wordmark-split,
-  .split-wordmark-snap {
+  .zaptab-wordmark-zap,
+  .zaptab-wordmark-tab {
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
     -webkit-text-fill-color: transparent;
   }
 
-  .split-wordmark-split {
+  .zaptab-wordmark-zap {
     background-image: linear-gradient(
       168deg,
       #ffffff 0%,
@@ -112,7 +112,7 @@ html {
       drop-shadow(0 4px 10px rgba(0, 0, 0, 0.45));
   }
 
-  .split-wordmark-snap {
+  .zaptab-wordmark-tab {
     background-image: linear-gradient(
       168deg,
       #fffef5 0%,
@@ -282,6 +282,42 @@ html {
 
   .card-premium {
     @apply relative overflow-hidden rounded-2xl border border-amber-500/20 bg-linear-to-br from-amber-500/10 via-neutral-900/40 to-neutral-900/40;
+  }
+
+  .auth-card-compact {
+    @apply p-4 space-y-3;
+  }
+
+  .auth-welcome-shimmer {
+    font-family: var(--font-serif);
+    font-size: clamp(1.5rem, 4vw, 1.875rem);
+    font-weight: 600;
+    line-height: 1.2;
+    background-image: linear-gradient(
+      110deg,
+      #71717a 0%,
+      #fafafa 22%,
+      #d4d4d8 44%,
+      #ffffff 56%,
+      #a1a1aa 78%,
+      #e4e4e7 100%
+    );
+    background-size: 200% auto;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    -webkit-text-fill-color: transparent;
+    animation: auth-welcome-shimmer 4s ease-in-out infinite;
+  }
+
+  @keyframes auth-welcome-shimmer {
+    0%,
+    100% {
+      background-position: 0% center;
+    }
+    50% {
+      background-position: 100% center;
+    }
   }
 
   .input-field {

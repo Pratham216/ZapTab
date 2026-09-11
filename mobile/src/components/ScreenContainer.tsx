@@ -6,7 +6,10 @@ import {
   type StyleProp,
   type ViewStyle,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  SafeAreaView,
+  type Edge,
+} from "react-native-safe-area-context";
 import GridBackground from "./GridBackground";
 import { colors, spacing } from "../theme";
 
@@ -15,6 +18,7 @@ interface ScreenContainerProps {
   scroll?: boolean;
   center?: boolean;
   contentStyle?: StyleProp<ViewStyle>;
+  edges?: Edge[];
 }
 
 export default function ScreenContainer({
@@ -22,6 +26,7 @@ export default function ScreenContainer({
   scroll = false,
   center = false,
   contentStyle,
+  edges = ["top", "bottom"],
 }: ScreenContainerProps) {
   const inner = [
     styles.content,
@@ -30,7 +35,7 @@ export default function ScreenContainer({
   ];
 
   return (
-    <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
+    <SafeAreaView style={styles.safe} edges={edges}>
       <GridBackground />
       {scroll ? (
         <ScrollView

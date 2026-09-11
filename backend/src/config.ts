@@ -8,7 +8,7 @@ export type VisionProvider = "openrouter" | "nvidia";
 
 export const config = {
   port: parseInt(process.env.PORT ?? "3001", 10),
-  mongoUri: process.env.MONGODB_URI ?? "mongodb://localhost:27017/splitsnap",
+  mongoUri: process.env.MONGODB_URI ?? "mongodb://localhost:27017/zaptab",
   tesseractPath:
     process.env.TESSERACT_PATH ??
     "C:\\Program Files\\Tesseract-OCR\\tesseract.exe",

@@ -7,7 +7,7 @@ import { createUniqueRoomCode } from "../utils/roomCode";
 import { getJoinUrl } from "../utils/networkUrl";
 import { serializeSelections } from "./selectionService";
 import { isGuestPaid } from "./paymentService";
-import { isValidUpiId, normalizeUpiId } from "@splitsnap/shared";
+import { isValidUpiId, normalizeUpiId } from "@zaptab/shared";
 
 export async function createRoom(
   billId: string,

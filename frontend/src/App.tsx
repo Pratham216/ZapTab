@@ -1,5 +1,7 @@
 import { Routes, Route } from "react-router-dom";
+import { AuthenticateWithRedirectCallback } from "@clerk/clerk-react";
 import LandingPage from "./pages/LandingPage";
+import AuthPage from "./pages/AuthPage";
 import ScanPage from "./pages/ScanPage";
 import BillPage from "./pages/BillPage";
 import JoinPage from "./pages/JoinPage";
@@ -13,6 +15,11 @@ export default function App() {
   return (
     <Routes>
       <Route path="/" element={<LandingPage />} />
+      <Route path="/sign-in" element={<AuthPage />} />
+      <Route
+        path="/sso-callback"
+        element={<AuthenticateWithRedirectCallback />}
+      />
       <Route
         path="/onboarding"
         element={
@@ -24,7 +31,7 @@ export default function App() {
       <Route
         path="/app"
         element={
-          <ProtectedRoute requireUpi>
+          <ProtectedRoute>
             <AppLayout>
               <ScanPage />
             </AppLayout>
@@ -34,7 +41,7 @@ export default function App() {
       <Route
         path="/bill/:id"
         element={
-          <ProtectedRoute requireUpi>
+          <ProtectedRoute>
             <AppLayout>
               <BillPage />
             </AppLayout>

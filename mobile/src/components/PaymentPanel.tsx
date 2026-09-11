@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Linking, StyleSheet, Text, View } from "react-native";
-import { isValidUpiId } from "@splitsnap/shared";
+import { isValidUpiId } from "@zaptab/shared";
 import Button from "./Button";
 import Card from "./Card";
 import InputField from "./InputField";
@@ -151,10 +151,10 @@ export default function PaymentPanel({
       </View>
 
       {!hasHostUpi ? (
-        <Text style={styles.warning}>Host hasn&apos;t added a UPI ID yet.</Text>
+        <Text style={styles.warning}>Host hasn't added a UPI ID yet.</Text>
       ) : isPaid ? (
         <View style={styles.paidMessage}>
-          <Text style={styles.paidMessageTitle}>You&apos;re all set!</Text>
+          <Text style={styles.paidMessageTitle}>You're all set!</Text>
           <Text style={styles.paidMessageBody}>Thanks for settling up</Text>
         </View>
       ) : (

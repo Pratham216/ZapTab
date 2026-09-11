@@ -6,8 +6,11 @@ import {
   signUserToken,
 } from "../middleware/auth";
 import { verifyClerkToken } from "../services/clerk";
+import { IUser } from "../models/User";
 import {
   findOrCreateUserFromClerk,
+  loginUserWithPassword,
+  registerUserWithPassword,
   serializeUser,
   updateUserUpi,
   getUserById,
@@ -15,9 +18,60 @@ import {
 
 const router = Router();
 
+function issueUserSession(user: IUser) {
+  const token = signUserToken({
+    guestId: user.participantGuestId,
+    userId: user._id.toString(),
+    clerkId: user.clerkId,
+  });
+
+  return {
+    token,
+    guestId: user.participantGuestId,
+    user: serializeUser(user),
+  };
+}
+
 router.post("/guest", (_req, res) => {
   const session = createGuestSession();
   res.json(session);
+});
+
+router.post("/register", async (req, res) => {
+  try {
+    const { email, password, name } = req.body ?? {};
+    const user = await registerUserWithPassword({
+      email: String(email ?? ""),
+      password: String(password ?? ""),
+      name: String(name ?? ""),
+    });
+    res.status(201).json(issueUserSession(user));
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Failed to create account";
+    const status = message.toLowerCase().includes("already exists") ? 409 : 400;
+    res.status(status).json({ error: message });
+  }
+});
+
+router.post("/login", async (req, res) => {
+  try {
+    const { email, password } = req.body ?? {};
+    const user = await loginUserWithPassword({
+      email: String(email ?? ""),
+      password: String(password ?? ""),
+    });
+    res.json(issueUserSession(user));
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Failed to sign in";
+    const status =
+      message.toLowerCase().includes("incorrect") ||
+      message.toLowerCase().includes("no account")
+        ? 401
+        : 400;
+    res.status(status).json({ error: message });
+  }
 });
 
 router.post("/sync", async (req, res) => {
@@ -36,17 +90,7 @@ router.post("/sync", async (req, res) => {
     }
 
     const user = await findOrCreateUserFromClerk(identity);
-    const token = signUserToken({
-      guestId: user.participantGuestId,
-      userId: user._id.toString(),
-      clerkId: user.clerkId,
-    });
-
-    res.json({
-      token,
-      guestId: user.participantGuestId,
-      user: serializeUser(user),
-    });
+    res.json(issueUserSession(user));
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Failed to sync account";

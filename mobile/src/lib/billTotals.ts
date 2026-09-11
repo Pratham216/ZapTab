@@ -39,3 +39,9 @@ export function recalcGrandTotal(bill: Bill): Bill {
   const subtotal = bill.subtotal ?? sumItemPrices(bill.items);
   return { ...bill, grandTotal: subtotal + bill.tax + bill.serviceCharge };
 }
+
+export function getBillDisplayTotal(bill: Bill): number {
+  const itemsTotal = sumItemPrices(bill.items);
+  const subtotal = bill.subtotal ?? itemsTotal;
+  return bill.grandTotal ?? subtotal + bill.tax + bill.serviceCharge;
+}

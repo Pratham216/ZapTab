@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Pressable,
   StyleSheet,
   Text,
@@ -14,6 +15,7 @@ import Card from "../components/Card";
 import QRDisplay from "../components/QRDisplay";
 import ItemSelectionList from "../components/ItemSelectionList";
 import PaymentPanel from "../components/PaymentPanel";
+import UserAvatar from "../components/UserAvatar";
 import {
   getRoom,
   leaveRoom,
@@ -24,10 +26,23 @@ import { useAuth } from "../contexts/AuthContext";
 import { useSocket } from "../hooks/useSocket";
 import { applySelectionChange } from "../lib/selections";
 import { getParticipantShare } from "../lib/payments";
+import { saveRoom } from "../lib/history";
 import { colors, fontSize, radius, spacing, typography } from "../theme";
 import type { RootStackParamList } from "../navigation/AppNavigator";
 
 type Props = NativeStackScreenProps<RootStackParamList, "Room">;
+
+function formatExpiresIn(expiresAtIso?: string): string | null {
+  if (!expiresAtIso) return null;
+  const exp = new Date(expiresAtIso).getTime();
+  if (Number.isNaN(exp)) return null;
+  const diffMs = exp - Date.now();
+  if (diffMs <= 0) return "Expired";
+  const hours = Math.floor(diffMs / (1000 * 60 * 60));
+  const mins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+  if (hours > 0) return `Expires in ${hours}h ${mins}m`;
+  return `Expires in ${mins}m`;
+}
 
 export default function RoomScreen({ navigation, route }: Props) {
   const roomCode = route.params.code.toUpperCase();
@@ -46,12 +61,20 @@ export default function RoomScreen({ navigation, route }: Props) {
       const data = await getRoom(roomCode);
       setRoom(data);
       setError(null);
+      if (data.bill) {
+        const isHost = session?.guestId === data.hostGuestId;
+        await saveRoom({
+          code: data.code,
+          role: isHost ? "host" : "guest",
+          restaurantName: data.bill.restaurantName,
+        });
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Room not found");
     } finally {
       setLoading(false);
     }
-  }, [roomCode]);
+  }, [roomCode, session?.guestId]);
 
   useEffect(() => {
     loadRoom();
@@ -82,29 +105,36 @@ export default function RoomScreen({ navigation, route }: Props) {
   }
 
   async function handleLeave() {
-    await leaveRoom(roomCode);
-    navigation.reset({
-      index: 0,
-      routes: [{ name: "Welcome" }],
-    });
+    Alert.alert(
+      "Leave room?",
+      "You'll exit this bill split. You can rejoin with the room code.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Leave",
+          style: "destructive",
+          onPress: async () => {
+            await leaveRoom(roomCode);
+            navigation.reset({
+              index: 0,
+              routes: [{ name: "Main" }],
+            });
+          },
+        },
+      ]
+    );
   }
 
   async function handleSetQuantity(itemId: string, quantity: number) {
     if (!myGuestId) return;
 
     setSelectionError(null);
-
-    const previous = room;
-    setRoom((old) =>
-      old ? applySelectionChange(old, itemId, myGuestId, quantity) : old
-    );
     setUpdatingItemId(itemId);
 
     try {
       const updated = await setItemSelection(roomCode, itemId, quantity);
       setRoom(updated);
     } catch (err) {
-      if (previous) setRoom(previous);
       setSelectionError(
         err instanceof Error ? err.message : "Failed to update selection"
       );
@@ -126,7 +156,7 @@ export default function RoomScreen({ navigation, route }: Props) {
       <ScreenContainer center>
         <Text style={typography.heading}>Room not found</Text>
         <Text style={[typography.body, styles.errorText]}>{error}</Text>
-        <Button label="Go home" onPress={() => navigation.popToTop()} />
+        <Button label="Go home" onPress={() => navigation.navigate("Main")} />
       </ScreenContainer>
     );
   }
@@ -144,6 +174,12 @@ export default function RoomScreen({ navigation, route }: Props) {
           </Text>
           <Text style={styles.code}>
             Code: <Text style={styles.codeValue}>{room.code}</Text>
+            {formatExpiresIn(room.expiresAt) ? (
+              <Text style={styles.expiresText}>
+                {" · "}
+                {formatExpiresIn(room.expiresAt)}
+              </Text>
+            ) : null}
           </Text>
           {isHost ? (
             <View style={styles.hostBadgeWrap}>
@@ -175,11 +211,7 @@ export default function RoomScreen({ navigation, route }: Props) {
             const share = getParticipantShare(room, p.guestId);
             return (
               <View key={p.id} style={styles.participantRow}>
-                <View style={styles.avatar}>
-                  <Text style={styles.avatarText}>
-                    {p.name.charAt(0).toUpperCase()}
-                  </Text>
-                </View>
+                <UserAvatar name={p.name} size="xs" />
                 <Text style={styles.participantName}>{p.name}</Text>
                 <View style={styles.participantMeta}>
                   {!isRoomHost && share && share.total > 0 ? (
@@ -275,6 +307,10 @@ const styles = StyleSheet.create({
     color: colors.gold,
     fontFamily: "monospace",
   },
+  expiresText: {
+    color: colors.textMuted,
+    fontSize: fontSize.xs,
+  },
   hostBadgeWrap: {
     alignSelf: "flex-start",
     marginTop: spacing.xs,
@@ -314,25 +350,11 @@ const styles = StyleSheet.create({
   participantRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: spacing.md,
+    gap: spacing.sm,
     backgroundColor: colors.surfaceElevated,
     borderRadius: radius.md,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
-  },
-  avatar: {
-    width: 32,
-    height: 32,
-    borderRadius: radius.pill,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  avatarText: {
-    color: colors.textPrimary,
-    fontWeight: "700",
   },
   participantName: {
     flex: 1,

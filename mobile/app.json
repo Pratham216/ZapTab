@@ -1,12 +1,12 @@
 {
   "expo": {
-    "name": "SplitSnap",
-    "slug": "splitsnap",
+    "name": "ZapTab",
+    "slug": "zaptab",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
-    "scheme": "splitsnap",
+    "scheme": "zaptab",
     "ios": {
       "supportsTablet": true
     },
@@ -17,12 +17,16 @@
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "usesCleartextTraffic": true,
-      "predictiveBackGestureEnabled": false
+      "usesCleartextTraffic": false,
+      "predictiveBackGestureEnabled": false,
+      "package": "app.zaptab.mobile"
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
+    "plugins": [
+      "expo-font"
+    ],
     "extra": {
       "apiUrl": "https://splitsnap-wrrg.onrender.com"
     }

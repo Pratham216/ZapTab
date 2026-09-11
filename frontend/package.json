@@ -11,7 +11,7 @@
   "dependencies": {
     "@clerk/clerk-react": "^5.61.3",
     "@gsap/react": "^2.1.2",
-    "@splitsnap/shared": "workspace:*",
+    "@zaptab/shared": "workspace:*",
     "@tanstack/react-query": "^5.68.0",
     "gsap": "^3.15.0",
     "qrcode.react": "^4.2.0",

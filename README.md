@@ -1,8 +1,8 @@
-# SplitSnap
+# ZapTab
 
 ### Scan the bill. Tap what you ate. Pay your share.
 
-SplitSnap is a bill-splitting app for group dinners. Snap a receipt, split it item by item, and settle up with UPI — no spreadsheets, no awkward math at the table.
+ZapTab is a bill-splitting app for group dinners. Snap a receipt, split it item by item, and settle up with UPI — no spreadsheets, no awkward math at the table.
 
 **Dinner shouldn't end in math class.**
 
@@ -57,6 +57,6 @@ SplitSnap is a bill-splitting app for group dinners. Snap a receipt, split it it
 
 <p align="center">
   <br />
-  <strong>SplitSnap</strong><br />
+  <strong>ZapTab</strong><br />
   <sub>Receipt → room → settled.</sub>
 </p>

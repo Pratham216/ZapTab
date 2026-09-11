@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import SplitSnapWordmark from "./SplitSnapWordmark";
+import ZapTabWordmark from "./ZapTabWordmark";
 
 interface GuestLayoutProps {
   children: React.ReactNode;
@@ -12,11 +12,11 @@ export default function GuestLayout({ children }: GuestLayoutProps) {
         <div className="max-w-3xl mx-auto px-4 py-4">
           <Link to="/" className="inline-flex items-center gap-3">
             <img
-              src="/splitsnap-logo.png"
-              alt="SplitSnap Logo"
+              src="/zaptab-logo.png"
+              alt="ZapTab Logo"
               className="h-9 w-9 object-contain"
             />
-            <SplitSnapWordmark size="lg" />
+            <ZapTabWordmark size="lg" />
           </Link>
         </div>
       </header>

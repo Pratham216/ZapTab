@@ -1,9 +1,9 @@
 import { useLayoutEffect, useRef } from "react";
 import { Link } from "react-router-dom";
-import { SignInButton, SignUpButton, useAuth } from "@clerk/clerk-react";
+import { useAuth } from "@clerk/clerk-react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
-import SplitSnapWordmark from "../components/SplitSnapWordmark";
+import ZapTabWordmark from "../components/ZapTabWordmark";
 import ClickSparkles from "../components/ClickSparkles";
 
 gsap.registerPlugin(ScrollTrigger);
@@ -329,20 +329,22 @@ export default function LandingPage() {
 
       <nav className="fixed top-0 inset-x-0 z-50">
         <div className="max-w-7xl mx-auto py-5 flex items-center justify-between">
-          <SplitSnapWordmark size="xl" />
+          <ZapTabWordmark size="xl" />
           <div className="flex items-center gap-4">
             {!isSignedIn ? (
               <>
-                <SignInButton mode="modal">
-                  <button className="text-sm text-neutral-300 hover:text-white transition-colors">
-                    Sign in
-                  </button>
-                </SignInButton>
-                <SignUpButton mode="modal">
-                  <button className="text-sm px-4 py-2 btn-primary rounded-full">
-                    Get started
-                  </button>
-                </SignUpButton>
+                <Link
+                  to="/sign-in"
+                  className="text-sm text-neutral-300 hover:text-white transition-colors"
+                >
+                  Sign in
+                </Link>
+                <Link
+                  to="/sign-in?mode=sign-up"
+                  className="text-sm px-4 py-2 btn-primary rounded-full"
+                >
+                  Get started
+                </Link>
               </>
             ) : (
               <Link
@@ -384,11 +386,12 @@ export default function LandingPage() {
                   Start scanning
                 </Link>
               ) : (
-                <SignUpButton mode="modal">
-                  <button className="inline-flex items-center px-8 py-3.5 btn-primary rounded-full font-medium transition-all hover:scale-[1.02]">
-                    Get started free
-                  </button>
-                </SignUpButton>
+                <Link
+                  to="/sign-in?mode=sign-up"
+                  className="inline-flex items-center px-8 py-3.5 btn-primary rounded-full font-medium transition-all hover:scale-[1.02]"
+                >
+                  Get started free
+                </Link>
               )}
               <a
                 href="#how-it-works"
@@ -633,14 +636,15 @@ export default function LandingPage() {
                   to="/app"
                   className="inline-flex px-10 py-4 btn-primary rounded-full font-medium transition-all hover:scale-[1.03] shadow-lg shadow-amber-500/25"
                 >
-                  Open SplitSnap
+                  Open ZapTab
                 </Link>
               ) : (
-                <SignUpButton mode="modal">
-                  <button className="inline-flex px-10 py-4 btn-primary rounded-full font-medium transition-all hover:scale-[1.03] shadow-lg shadow-amber-500/25">
-                    Create free account
-                  </button>
-                </SignUpButton>
+                <Link
+                  to="/sign-in?mode=sign-up"
+                  className="inline-flex px-10 py-4 btn-primary rounded-full font-medium transition-all hover:scale-[1.03] shadow-lg shadow-amber-500/25"
+                >
+                  Create free account
+                </Link>
               )}
 
               <p className="mt-6 text-xs text-neutral-600">
@@ -657,7 +661,7 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto py-6 sm:py-8">
           <div className="grid sm:grid-cols-2 lg:grid-cols-12 gap-6 lg:gap-6 mb-5">
             <div className="footer-col sm:col-span-2 lg:col-span-5">
-              <SplitSnapWordmark size="lg" />
+              <ZapTabWordmark size="lg" />
               <p className="mt-3 text-sm text-neutral-500 leading-relaxed max-w-xs">
                 The fastest way to split restaurant bills with friends — scan,
                 select, and pay.
@@ -700,18 +704,19 @@ export default function LandingPage() {
                   Start scanning
                 </Link>
               ) : (
-                <SignUpButton mode="modal">
-                  <button className="inline-flex text-sm px-5 py-2.5 btn-primary rounded-full font-medium">
-                    Get started free
-                  </button>
-                </SignUpButton>
+                <Link
+                  to="/sign-in?mode=sign-up"
+                  className="inline-flex text-sm px-5 py-2.5 btn-primary rounded-full font-medium"
+                >
+                  Get started free
+                </Link>
               )}
             </div>
           </div>
 
           <div className="footer-col pt-5 border-t border-neutral-800/80 flex flex-col sm:flex-row items-center justify-between gap-3">
             <p className="text-xs text-neutral-600">
-              © {new Date().getFullYear()} SplitSnap
+              © {new Date().getFullYear()} ZapTab
             </p>
             <p className="text-sm text-neutral-500 text-center sm:text-right">
               <span className="text-amber-400/90">Scan</span> the bill.{" "}

@@ -30,13 +30,30 @@ export function sumItemPrices(items: { price: number }[]): number {  return item
   );
 }
 
+export function getTotalTax(bill: {
+  tax?: number;
+  cgst?: number;
+  sgst?: number;
+  vat?: number;
+  otherTax?: number;
+}): number {
+  const cgst = bill.cgst ?? 0;
+  const sgst = bill.sgst ?? 0;
+  const vat = bill.vat ?? 0;
+  const otherTax = bill.otherTax ?? 0;
+  const itemTaxSum = roundMoney(cgst + sgst + vat + otherTax);
+  return itemTaxSum > 0 ? itemTaxSum : (bill.tax ?? 0);
+}
+
 export function recalcBillFromItems(bill: Bill): Bill {
   const subtotal = sumItemPrices(bill.items);
-  const grandTotal = subtotal + bill.tax + bill.serviceCharge;
-  return { ...bill, subtotal, grandTotal };
+  const tax = getTotalTax(bill);
+  const grandTotal = bill.grandTotal ?? roundMoney(subtotal + tax + (bill.serviceCharge ?? 0));
+  return { ...bill, subtotal, tax, grandTotal };
 }
 
 export function recalcGrandTotal(bill: Bill): Bill {
   const subtotal = bill.subtotal ?? sumItemPrices(bill.items);
-  return { ...bill, grandTotal: subtotal + bill.tax + bill.serviceCharge };
+  const tax = getTotalTax(bill);
+  return { ...bill, tax, grandTotal: roundMoney(subtotal + tax + (bill.serviceCharge ?? 0)) };
 }

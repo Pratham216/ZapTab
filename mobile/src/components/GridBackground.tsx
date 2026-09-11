@@ -1,6 +1,7 @@
 import { StyleSheet, useWindowDimensions, View } from "react-native";
 import Svg, { Defs, Line, Pattern, Rect } from "react-native-svg";
 import { colors } from "../theme";
+import { noPointer } from "../lib/platformStyles";
 
 const GRID_SIZE = 80;
 
@@ -8,7 +9,7 @@ export default function GridBackground() {
   const { width, height } = useWindowDimensions();
 
   return (
-    <View style={styles.wrap} pointerEvents="none">
+    <View style={[styles.wrap, noPointer]}>
       <Svg width={width} height={height}>
         <Defs>
           <Pattern
@@ -44,7 +45,7 @@ export default function GridBackground() {
 
 const styles = StyleSheet.create({
   wrap: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     zIndex: 0,
   },
 });

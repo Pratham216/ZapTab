@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { UserButton } from "@clerk/clerk-react";
-import SplitSnapWordmark from "./SplitSnapWordmark";
+import ZapTabWordmark from "./ZapTabWordmark";
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -13,12 +13,12 @@ export default function AppLayout({ children }: AppLayoutProps) {
         <div className="max-w-3xl mx-auto px-4 py-4 flex items-center justify-between">
           <Link to="/app" className="flex items-center gap-3">
             <img
-              src="/splitsnap-logo.png"
-              alt="SplitSnap Logo"
+              src="/zaptab-logo.png"
+              alt="ZapTab Logo"
               className="h-9 w-9 object-contain"
             />
             <div>
-              <SplitSnapWordmark as="h1" size="lg" />
+              <ZapTabWordmark as="h1" size="lg" />
               <p className="text-xs leading-relaxed text-neutral-100">
                 Scan the bill. Tap what you ate. Pay your share.
               </p>

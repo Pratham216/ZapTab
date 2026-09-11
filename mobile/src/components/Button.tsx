@@ -1,7 +1,8 @@
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -10,6 +11,7 @@ import {
   type ViewStyle,
 } from "react-native";
 import { colors, fontSize, radius, spacing } from "../theme";
+import { goldGlowShadow, noPointer } from "../lib/platformStyles";
 
 type Variant =
   | "primary"
@@ -42,16 +44,18 @@ export default function Button({
 }: ButtonProps) {
   const isDisabled = disabled || loading;
   const shimmerX = useRef(new Animated.Value(-1)).current;
+  const [shimmering, setShimmering] = useState(false);
   const showShimmer = shimmer || variant === "copyLink";
 
   function runShimmer() {
     if (!showShimmer) return;
+    setShimmering(true);
     shimmerX.setValue(-1);
     Animated.timing(shimmerX, {
       toValue: 1,
       duration: 650,
       useNativeDriver: true,
-    }).start();
+    }).start(() => setShimmering(false));
   }
 
   const loaderColor =
@@ -79,12 +83,12 @@ export default function Button({
         style,
       ]}
     >
-      {showShimmer && (
+      {showShimmer && shimmering && (
         <Animated.View
-          pointerEvents="none"
           style={[
             styles.shimmer,
             variant === "primary" && styles.shimmerPrimary,
+            noPointer,
             {
               transform: [
                 {
@@ -115,7 +119,7 @@ const styles = StyleSheet.create({
   base: {
     paddingHorizontal: spacing.xl,
     paddingVertical: spacing.md + 2,
-    borderRadius: radius.pill,
+    borderRadius: radius.md,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -166,11 +170,7 @@ const variantStyles: Record<
   primary: {
     container: {
       backgroundColor: colors.gold,
-      shadowColor: colors.gold,
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.25,
-      shadowRadius: 8,
-      elevation: 4,
+      ...goldGlowShadow(),
     },
     label: { color: colors.onGold },
     pressed: { opacity: 0.85, transform: [{ scale: 0.99 }] },
@@ -223,11 +223,15 @@ const variantStyles: Record<
     pressed: {
       borderColor: colors.gold,
       backgroundColor: colors.goldMutedStrong,
-      shadowColor: colors.gold,
-      shadowOffset: { width: 0, height: 0 },
-      shadowOpacity: 0.35,
-      shadowRadius: 12,
-      elevation: 3,
+      ...(Platform.OS === "web"
+        ? ({ boxShadow: "0 0 12px rgba(217, 119, 6, 0.35)" } as const)
+        : {
+            shadowColor: colors.gold,
+            shadowOffset: { width: 0, height: 0 },
+            shadowOpacity: 0.35,
+            shadowRadius: 12,
+            elevation: 3,
+          }),
     },
   },
 };

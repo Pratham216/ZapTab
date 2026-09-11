@@ -5,10 +5,11 @@ import {
   getMyQuantity,
   getTotalClaimedForItem,
   getUnclaimedUnitsCount,
-} from "@splitsnap/shared";
+} from "@zaptab/shared";
 import type { Bill, BillItem } from "../api/bills";
 import type { Participant, Room } from "../api/rooms";
 import { useDebouncedCallback } from "../hooks/useDebouncedCallback";
+import { getBillForShare } from "../lib/payments";
 
 export function applySelectionChange(
   room: Room,
@@ -203,16 +204,7 @@ export default function ItemSelectionList({
     onSetQuantity(itemId, quantity);
   }
 
-  const billForShare = {
-    items: bill.items.map((i) => ({
-      id: i.id,
-      price: i.price,
-      quantity: i.quantity,
-    })),
-    subtotal: bill.subtotal,
-    tax: bill.tax,
-    serviceCharge: bill.serviceCharge,
-  };
+  const billForShare = getBillForShare(bill);
 
   const myShare = myGuestId
     ? calculatePersonShare(billForShare, displaySelections, myGuestId)

@@ -15,6 +15,7 @@ interface InputFieldProps {
   onChangeText: (text: string) => void;
   onBlur?: () => void;
   keyboardType?: KeyboardTypeOptions;
+  autoCapitalize?: "none" | "sentences" | "words" | "characters";
   prefix?: string;
   placeholder?: string;
   style?: StyleProp<ViewStyle>;
@@ -26,6 +27,7 @@ export default function InputField({
   onChangeText,
   onBlur,
   keyboardType = "default",
+  autoCapitalize,
   prefix,
   placeholder,
   style,
@@ -41,6 +43,7 @@ export default function InputField({
           onChangeText={onChangeText}
           onBlur={onBlur}
           keyboardType={keyboardType}
+          autoCapitalize={autoCapitalize}
           placeholder={placeholder}
           placeholderTextColor={colors.textMuted}
           selectionColor={colors.gold}

@@ -1,4 +1,4 @@
-/** SplitSnap design tokens — black, white, gray, gold */
+/** ZapTab design tokens — black, white, gray, gold */
 export const tokens = {
   background: "#0a0a0a",
   surface: "#171717",

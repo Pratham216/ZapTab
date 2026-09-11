@@ -1,5 +1,5 @@
 import type { Bill } from "./bills";
-import type { SelectionsMap } from "@splitsnap/shared";
+import type { SelectionsMap } from "@zaptab/shared";
 import { apiRequest } from "./client";
 
 export interface Participant {

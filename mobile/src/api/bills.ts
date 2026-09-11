@@ -1,6 +1,6 @@
 import { File as ExpoFile, UploadType } from "expo-file-system";
 import { apiRequest } from "../lib/api";
-import { ensureGuestSession } from "../lib/auth";
+import { resolveApiToken } from "../lib/auth";
 import { getApiUrl } from "../lib/config";
 
 export interface BillItem {
@@ -49,7 +49,7 @@ function parseUploadError(status: number, body: string): string {
 export async function uploadBillImage(
   asset: PickedReceiptAsset
 ): Promise<{ id: string; status: Bill["status"] }> {
-  const session = await ensureGuestSession();
+  const token = await resolveApiToken();
   const mimeType = receiptMimeType(asset);
   const uploadUrl = `${getApiUrl()}/bills/upload`;
 
@@ -59,7 +59,7 @@ export async function uploadBillImage(
     const res = await fetch(uploadUrl, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${session.token}`,
+        Authorization: `Bearer ${token}`,
       },
       body: formData,
     });
@@ -76,7 +76,7 @@ export async function uploadBillImage(
     fieldName: "file",
     mimeType,
     headers: {
-      Authorization: `Bearer ${session.token}`,
+      Authorization: `Bearer ${token}`,
       Accept: "application/json",
     },
   });

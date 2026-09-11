@@ -1,4 +1,4 @@
-import { ParsedBillSchema } from "@splitsnap/shared";
+import { ParsedBillSchema } from "@zaptab/shared";
 import { config } from "../config";
 
 const PARSE_PROMPT = `You are a restaurant bill parser. Extract structured data from OCR text of a receipt.
@@ -40,7 +40,7 @@ async function parseBillWithOpenRouter(ocrText: string) {
           Authorization: `Bearer ${config.openRouterApiKey}`,
           "Content-Type": "application/json",
           "HTTP-Referer": "http://localhost:5173",
-          "X-Title": "SplitSnap",
+          "X-Title": "ZapTab",
         },
         body: JSON.stringify({
           model: config.openRouterModel,
