@@ -96,8 +96,17 @@ router.patch("/:id", async (req, res) => {
     return;
   }
 
-  const { restaurantName, billDate, tax, serviceCharge, subtotal, grandTotal } =
-    req.body;
+  const {
+    restaurantName,
+    billDate,
+    tax,
+    serviceCharge,
+    subtotal,
+    grandTotal,
+    cgst,
+    sgst,
+    vat,
+  } = req.body;
 
   if (restaurantName !== undefined) bill.restaurantName = restaurantName;
   if (billDate !== undefined) bill.billDate = billDate;
@@ -105,6 +114,9 @@ router.patch("/:id", async (req, res) => {
   if (serviceCharge !== undefined) bill.serviceCharge = Number(serviceCharge);
   if (subtotal !== undefined) bill.subtotal = Number(subtotal);
   if (grandTotal !== undefined) bill.grandTotal = Number(grandTotal);
+  if (cgst !== undefined) bill.cgst = Number(cgst);
+  if (sgst !== undefined) bill.sgst = Number(sgst);
+  if (vat !== undefined) bill.vat = Number(vat);
 
   await bill.save();
   res.json(serializeBill(bill));

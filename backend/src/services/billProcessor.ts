@@ -5,8 +5,11 @@ import { parseBillFromOcr, parseBillLocal } from "./parser";
 import { isVisionSupportedImage, parseBillFromImage } from "./visionParser";
 import { config, isVisionConfigured } from "../config";
 import type { ParsedBill } from "@zaptab/shared";
+import { reconcileBill } from "../utils/reconciliation";
 
 function applyParsedBill(bill: IBill, parsed: ParsedBill, ocrText?: string) {
+  const recon = reconcileBill(parsed);
+
   bill.restaurantName = parsed.restaurantName;
   bill.billDate = parsed.billDate;
   bill.items.splice(
@@ -16,15 +19,47 @@ function applyParsedBill(bill: IBill, parsed: ParsedBill, ocrText?: string) {
       name: item.name,
       price: item.price,
       quantity: item.quantity,
+      unitPrice: item.unitPrice,
     }))
   );
-  bill.subtotal = parsed.subtotal;
-  bill.tax = parsed.tax;
-  bill.serviceCharge = parsed.serviceCharge;
-  bill.grandTotal = parsed.grandTotal;
+  bill.subtotal = parsed.subtotal ?? recon.receiptSubtotal;
+  bill.tax = parsed.tax ?? recon.totalTax;
+  bill.serviceCharge = parsed.serviceCharge ?? recon.serviceCharge;
+  bill.cgst = parsed.cgst;
+  bill.sgst = parsed.sgst;
+  bill.vat = parsed.vat;
+  bill.otherTax = parsed.otherTax;
+  bill.discount = parsed.discount;
+  bill.tip = parsed.tip;
+  bill.grandTotal = parsed.grandTotal ?? recon.calculatedGrandTotal;
+  bill.receiptSubtotal = parsed.receiptSubtotal ?? parsed.subtotal;
+  bill.calculatedItemSubtotal = recon.calculatedItemSubtotal;
+  bill.printedBillTotal = parsed.printedBillTotal ?? parsed.grandTotal;
+  bill.roundedPayableTotal = parsed.roundedPayableTotal;
+  bill.isItemSubtotalValid = recon.isItemSubtotalValid;
+  bill.requiresVerification = recon.requiresVerification;
+  bill.validationWarnings = recon.validationWarnings;
   if (ocrText !== undefined) bill.ocrText = ocrText;
   bill.status = "parsed";
   bill.errorMessage = undefined;
+
+  console.log(`[BillProcessor] Processed bill ${bill._id}:`);
+  console.log(`  · item count: ${parsed.items.length}`);
+  console.log(`  · calculated item subtotal: ₹${recon.calculatedItemSubtotal.toFixed(2)}`);
+  console.log(`  · receipt subtotal: ₹${recon.receiptSubtotal.toFixed(2)}`);
+  console.log(
+    `  · difference: ₹${Math.abs(recon.receiptSubtotal - recon.calculatedItemSubtotal).toFixed(2)}`
+  );
+  console.log(
+    `  · validation status: ${
+      recon.isItemSubtotalValid ? "VALID ✅" : "REQUIRES VERIFICATION ⚠️"
+    }`
+  );
+  if (recon.validationWarnings.length > 0) {
+    for (const w of recon.validationWarnings) {
+      console.warn(`    ⚠️ ${w}`);
+    }
+  }
 }
 
 export async function processBill(billId: string): Promise<void> {
@@ -103,6 +138,8 @@ export async function processBill(billId: string): Promise<void> {
 }
 
 export function serializeBill(bill: IBill) {
+  const calculatedItemsTotal = bill.items.reduce((s, i) => s + i.price, 0);
+
   return {
     id: bill._id.toString(),
     restaurantName: bill.restaurantName,
@@ -112,11 +149,25 @@ export function serializeBill(bill: IBill) {
       name: item.name,
       price: item.price,
       quantity: item.quantity,
+      unitPrice: item.unitPrice,
     })),
     subtotal: bill.subtotal,
     tax: bill.tax,
     serviceCharge: bill.serviceCharge,
+    cgst: bill.cgst ?? 0,
+    sgst: bill.sgst ?? 0,
+    vat: bill.vat ?? 0,
+    otherTax: bill.otherTax ?? 0,
+    discount: bill.discount ?? 0,
+    tip: bill.tip ?? 0,
     grandTotal: bill.grandTotal,
+    receiptSubtotal: bill.receiptSubtotal ?? bill.subtotal,
+    calculatedItemSubtotal: bill.calculatedItemSubtotal ?? calculatedItemsTotal,
+    printedBillTotal: bill.printedBillTotal ?? bill.grandTotal,
+    roundedPayableTotal: bill.roundedPayableTotal,
+    isItemSubtotalValid: bill.isItemSubtotalValid ?? true,
+    requiresVerification: bill.requiresVerification ?? false,
+    validationWarnings: bill.validationWarnings ?? [],
     status: bill.status,
     errorMessage: bill.errorMessage,
     createdAt: bill.createdAt,

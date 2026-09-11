@@ -3,6 +3,7 @@ export interface BillItem {
   name: string;
   price: number;
   quantity: number;
+  unitPrice?: number;
 }
 
 export interface Bill {
@@ -13,7 +14,20 @@ export interface Bill {
   subtotal?: number;
   tax: number;
   serviceCharge: number;
+  cgst?: number;
+  sgst?: number;
+  vat?: number;
+  otherTax?: number;
+  discount?: number;
+  tip?: number;
   grandTotal?: number;
+  receiptSubtotal?: number;
+  calculatedItemSubtotal?: number;
+  printedBillTotal?: number;
+  roundedPayableTotal?: number;
+  isItemSubtotalValid?: boolean;
+  requiresVerification?: boolean;
+  validationWarnings?: string[];
   status: "uploading" | "processing" | "parsed" | "failed";
   errorMessage?: string;
   createdAt: string;
@@ -50,7 +64,20 @@ export async function getBillStatus(id: string): Promise<{
 
 export async function updateBill(
   id: string,
-  data: Partial<Pick<Bill, "restaurantName" | "billDate" | "tax" | "serviceCharge" | "subtotal" | "grandTotal">>
+  data: Partial<
+    Pick<
+      Bill,
+      | "restaurantName"
+      | "billDate"
+      | "tax"
+      | "serviceCharge"
+      | "subtotal"
+      | "grandTotal"
+      | "cgst"
+      | "sgst"
+      | "vat"
+    >
+  >
 ): Promise<Bill> {
   return request(`/bills/${id}`, {
     method: "PATCH",

@@ -7,34 +7,58 @@ import {
   isVisionConfigured,
 } from "../config";
 
-const VISION_PROMPT = `You are a restaurant bill parser. Read the receipt image and extract structured data.
+const VISION_PROMPT = `You are a precision restaurant bill parser. Read the receipt image carefully and extract structured data.
 
 Return ONLY valid JSON matching this schema:
 {
   "restaurantName": "string",
-  "billDate": "string (as shown on bill, or YYYY-MM-DD if clear)",
-  "items": [{ "name": "string", "price": number, "quantity": number }],
+  "billDate": "string (as shown on bill, e.g. YYYY-MM-DD or DD/MM/YYYY)",
+  "items": [{ "name": "string", "price": number, "quantity": number, "unitPrice": number or null }],
   "subtotal": number or null,
   "tax": number,
   "serviceCharge": number,
-  "grandTotal": number or null
+  "cgst": number,
+  "sgst": number,
+  "vat": number,
+  "otherTax": number,
+  "discount": number,
+  "tip": number,
+  "grandTotal": number or null,
+  "receiptSubtotal": number or null,
+  "printedBillTotal": number or null,
+  "roundedPayableTotal": number or null
 }
 
-Rules:
-- Currency is INR (₹). Use numeric values only, no currency symbols.
-- restaurantName: take it ONLY from the header/top area of the receipt (outlet/brand/store name, logo text, or address block). It never has a price or quantity next to it. If you cannot clearly identify it, return "" — do not guess.
-- CRITICAL: any line that has a price and/or a quantity is a purchased item and MUST appear in "items". Never use such a line as restaurantName, and never drop it. The first item line is still an item, not the restaurant name.
-- For each item: "quantity" = qty ordered; "price" = LINE TOTAL / Amount column (not per-unit rate).
-  Example: Qty 2, Rate 799, Amount 1598 → { "name": "...", "quantity": 2, "price": 1598 }
-- Example: "4 RAGI MUDDA 440.00" where 440 is line total → { "quantity": 4, "price": 440 }
-- "tax" = total GST (CGST + SGST combined). serviceCharge = service charge if any, else 0.
-- Include food/drink items only. Exclude tax lines, subtotals, payment info from items.
-- Some receipts put the item NAME on one line and Qty / Rate / Amount on the NEXT line.
-  Match each name to its following qty-rate-amount row. Do not skip items whose price is on a separate line.
-- Read every visible line item from the image. Do not invent items or prices not on the receipt.
-- The sum of all item prices should equal the printed subtotal. If it is short, you have missed an item — re-scan and include every priced line before answering.
-- If a field is missing, use 0 for numbers and "" for strings.
-- Return only JSON, no markdown.`;
+Strict Rules for Item Extraction:
+1. Extract EVERY purchased line item visible on the receipt. Never omit any item.
+2. PRESERVE DUPLICATE LINES: Receipts often contain multiple identical items listed on separate lines (e.g. 3 separate lines of "RED BULL ENERGY DRINK"). You MUST keep them as 3 separate items in the "items" array. Never collapse, merge, or deduplicate separate receipt lines into a single entry unless they are printed as a single line with quantity > 1.
+3. Quantity & Price:
+   - "quantity" = quantity ordered as printed on that item line (default 1).
+   - "price" = LINE TOTAL / AMOUNT column for that item line (not per-unit rate).
+   - "unitPrice" = rate per single unit if printed separately on the receipt, else null.
+   - Example: Qty 2, Rate 549, Amount 1098 → { "name": "DRUMS OF HEAVEN", "quantity": 2, "price": 1098, "unitPrice": 549 }
+4. Separating Charges from Items:
+   - Food & beverage items only belong in "items".
+   - NEVER put tax, CGST, SGST, VAT, service charge, subtotal, gross total, discount, tip, or payment info into "items".
+   - Extract individual charges separately:
+     * "cgst" = Central GST amount
+     * "sgst" = State GST amount
+     * "vat" = VAT amount (e.g. 10% VAT on liquor/beverages)
+     * "tax" = total tax (cgst + sgst + vat + otherTax)
+     * "serviceCharge" = service charge amount
+     * "discount" = total discount amount if present
+     * "tip" = tip amount if present
+5. Subtotal & Grand Total Breakdown:
+   - "subtotal" / "receiptSubtotal": exact printed subtotal before taxes/charges.
+   - "printedBillTotal": exact total before rounding.
+   - "roundedPayableTotal" / "grandTotal": final payable amount after rounding.
+6. MANDATORY INTERNAL SELF-CHECK BEFORE ANSWERING:
+   - Calculate SUM(item.price for all extracted items).
+   - Compare your calculated sum against the PRINTED RECEIPT SUBTOTAL.
+   - If your sum does NOT equal the printed subtotal, you have missed one or more line items (e.g. appetizers, starters, drinks, or items at the top/bottom of the item list).
+   - Re-examine the image line by line from top to bottom, locate the omitted line item(s), and include them so the items sum reconciles with the receipt subtotal.
+   - Do NOT invent non-existent items to make the numbers match. Locate the actual printed line items from the receipt.
+7. Return raw JSON only, with no markdown formatting.`;
 
 const MIME_BY_EXT: Record<string, string> = {
   ".jpg": "image/jpeg",

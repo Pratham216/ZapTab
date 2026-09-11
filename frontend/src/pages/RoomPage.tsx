@@ -63,6 +63,33 @@ export default function RoomPage() {
     },
   });
 
+  async function handleShare() {
+    if (!room?.joinUrl) return;
+    setCopyError(null);
+
+    if (typeof navigator !== "undefined" && navigator.share) {
+      try {
+        await navigator.share({
+          title: `Join ZapTab bill at ${room.bill?.restaurantName || 'Restaurant'}`,
+          text: `Join our ZapTab bill room using code ${room.code}!`,
+          url: room.joinUrl,
+        });
+        return;
+      } catch (err) {
+        if ((err as DOMException)?.name === "AbortError") return;
+      }
+    }
+
+    const ok = await copyToClipboard(room.joinUrl);
+    if (ok) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+      return;
+    }
+
+    setCopyError("Couldn't copy automatically — tap the link above to select it");
+  }
+
   async function copyLink() {
     if (!room?.joinUrl) return;
     setCopyError(null);
@@ -169,13 +196,25 @@ export default function RoomPage() {
           <p className="text-xs text-neutral-500 text-center break-all font-mono select-all">
             {room.joinUrl}
           </p>
-          <button
-            type="button"
-            onClick={copyLink}
-            className="btn-copy-shimmer"
-          >
-            {copied ? "Link copied!" : "Copy invite link"}
-          </button>
+          <div className="grid grid-cols-2 gap-2 pt-1">
+            <button
+              type="button"
+              onClick={handleShare}
+              className="btn-primary py-2 text-xs flex items-center justify-center gap-1.5"
+            >
+              <svg viewBox="0 0 24 24" fill="none" className="w-3.5 h-3.5" stroke="currentColor" strokeWidth="2">
+                <path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8M16 6l-4-4-4 4M12 2v13" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              Share link
+            </button>
+            <button
+              type="button"
+              onClick={copyLink}
+              className="btn-secondary py-2 text-xs"
+            >
+              {copied ? "Copied!" : "Copy link"}
+            </button>
+          </div>
           {copyError ? (
             <p className="text-xs text-amber-300/90 text-center">{copyError}</p>
           ) : null}

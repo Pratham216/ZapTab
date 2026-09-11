@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { uploadBill } from "../api/bills";
+import { trackEvent } from "../lib/analytics";
 
 export default function ScanPage() {
   const navigate = useNavigate();
@@ -12,11 +13,15 @@ export default function ScanPage() {
   async function handleFile(file: File) {
     setError(null);
     setUploading(true);
+    trackEvent("receipt_scan_started", { fileName: file.name, fileSize: file.size });
     try {
       const { id } = await uploadBill(file);
+      trackEvent("receipt_scan_completed", { billId: id });
       navigate(`/bill/${id}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Upload failed");
+      const msg = err instanceof Error ? err.message : "Upload failed";
+      trackEvent("receipt_scan_failed", { error: msg });
+      setError(msg);
     } finally {
       setUploading(false);
     }

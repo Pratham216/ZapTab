@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { joinRoom } from "../api/rooms";
 import { createFreshGuestSession } from "../lib/auth";
+import { trackEvent } from "../lib/analytics";
 
 export default function JoinPage() {
   const { code } = useParams<{ code: string }>();
@@ -19,6 +20,7 @@ export default function JoinPage() {
     try {
       await createFreshGuestSession();
       await joinRoom(code, name.trim());
+      trackEvent("room_joined", { code: code.toUpperCase(), guestName: name.trim() });
       navigate(`/room/${code.toUpperCase()}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to join");

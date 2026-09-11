@@ -14,9 +14,10 @@ import {
 } from "../api/bills";
 import { createRoom } from "../api/rooms";
 import { getCurrentUser } from "../api/users";
-import { recalcBillFromItems, recalcGrandTotal, sumItemPrices, applyItemFieldUpdate } from "../lib/billTotals";
+import { recalcBillFromItems, recalcGrandTotal, sumItemPrices, applyItemFieldUpdate, getTotalTax } from "../lib/billTotals";
 import { useDebouncedCallback } from "../hooks/useDebouncedCallback";
 import AnimatedEllipsis from "../components/AnimatedEllipsis";
+import { trackEvent } from "../lib/analytics";
 
 export default function BillPage() {
   const { id } = useParams<{ id: string }>();
@@ -145,6 +146,9 @@ function billsMatchForSave(a: Bill, b: Bill): boolean {
     a.billDate !== b.billDate ||
     a.tax !== b.tax ||
     a.serviceCharge !== b.serviceCharge ||
+    a.cgst !== b.cgst ||
+    a.sgst !== b.sgst ||
+    a.vat !== b.vat ||
     a.subtotal !== b.subtotal ||
     a.grandTotal !== b.grandTotal ||
     a.items.length !== b.items.length
@@ -192,6 +196,9 @@ async function persistBillToServer(lastSaved: Bill, draft: Bill): Promise<Bill> 
   if (serverBill.serviceCharge !== draft.serviceCharge) {
     billPatch.serviceCharge = draft.serviceCharge;
   }
+  if (serverBill.cgst !== draft.cgst) billPatch.cgst = draft.cgst;
+  if (serverBill.sgst !== draft.sgst) billPatch.sgst = draft.sgst;
+  if (serverBill.vat !== draft.vat) billPatch.vat = draft.vat;
   if (serverBill.subtotal !== draft.subtotal) billPatch.subtotal = draft.subtotal;
   if (serverBill.grandTotal !== draft.grandTotal) {
     billPatch.grandTotal = draft.grandTotal;
@@ -284,7 +291,15 @@ function BillEditor({ bill: initialBill }: { bill: Bill }) {
     fields: Partial<
       Pick<
         Bill,
-        "restaurantName" | "billDate" | "tax" | "serviceCharge" | "subtotal" | "grandTotal"
+        | "restaurantName"
+        | "billDate"
+        | "tax"
+        | "serviceCharge"
+        | "subtotal"
+        | "grandTotal"
+        | "cgst"
+        | "sgst"
+        | "vat"
       >
     >
   ) {
@@ -323,8 +338,9 @@ function BillEditor({ bill: initialBill }: { bill: Bill }) {
 
   const itemsTotal = sumItemPrices(draft.items);
   const displaySubtotal = draft.subtotal ?? itemsTotal;
+  const displayTotalTax = getTotalTax(draft);
   const displayGrandTotal =
-    draft.grandTotal ?? displaySubtotal + draft.tax + draft.serviceCharge;
+    draft.grandTotal ?? Math.round((displaySubtotal + displayTotalTax + draft.serviceCharge) * 100) / 100;
 
   async function handleCreateRoom() {
     if (!hostName.trim()) {
@@ -338,6 +354,7 @@ function BillEditor({ bill: initialBill }: { bill: Bill }) {
     setCreatingRoom(true);
     try {
       const room = await createRoom(id, hostName.trim());
+      trackEvent("room_created", { code: room.code, hostName: hostName.trim() });
       navigate(`/room/${room.code}`);
     } catch (err) {
       setRoomError(err instanceof Error ? err.message : "Failed to create room");
@@ -345,6 +362,11 @@ function BillEditor({ bill: initialBill }: { bill: Bill }) {
       setCreatingRoom(false);
     }
   }
+
+  const receiptSubtotal = draft.receiptSubtotal ?? draft.subtotal ?? 0;
+  const subtotalMismatch = receiptSubtotal > 0 && Math.abs(receiptSubtotal - itemsTotal) > 0.5;
+  const showVerification = draft.requiresVerification || !draft.isItemSubtotalValid || subtotalMismatch;
+  const mismatchDiff = Math.abs(receiptSubtotal - itemsTotal);
 
   return (
     <div className="space-y-7">
@@ -356,6 +378,49 @@ function BillEditor({ bill: initialBill }: { bill: Bill }) {
           Fix any mistakes before sharing with friends.
         </p>
       </div>
+
+      {showVerification && (
+        <div className="rounded-2xl border border-amber-500/40 bg-amber-500/10 p-5 text-amber-200 space-y-3 shadow-lg">
+          <div className="flex items-center gap-3">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-500/20 text-amber-400 font-bold text-lg">
+              ⚠️
+            </span>
+            <div>
+              <h4 className="font-semibold text-amber-100 text-base">Receipt needs verification</h4>
+              <p className="text-xs text-amber-300/80 mt-0.5">
+                Extracted item subtotal (₹{itemsTotal.toFixed(2)}) does not match receipt subtotal (₹{receiptSubtotal.toFixed(2)}).
+              </p>
+            </div>
+          </div>
+
+          <div className="rounded-xl bg-neutral-950/60 p-3.5 border border-amber-500/20 text-xs space-y-1.5 font-mono">
+            <div className="flex justify-between">
+              <span className="text-neutral-400">Extracted items total:</span>
+              <span className="text-amber-200 font-semibold">₹{itemsTotal.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-neutral-400">Receipt subtotal:</span>
+              <span className="text-amber-200 font-semibold">₹{receiptSubtotal.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between border-t border-neutral-800 pt-1.5 text-amber-400 font-bold">
+              <span>Difference (Possible missing item):</span>
+              <span>₹{mismatchDiff.toFixed(2)}</span>
+            </div>
+          </div>
+
+          {draft.validationWarnings && draft.validationWarnings.length > 0 && (
+            <div className="space-y-1 text-xs text-amber-300/90 pl-1">
+              {draft.validationWarnings.map((w, i) => (
+                <p key={i}>• {w}</p>
+              ))}
+            </div>
+          )}
+
+          <p className="text-xs text-neutral-400">
+            Please check the line items below and add any missing items before creating the room.
+          </p>
+        </div>
+      )}
 
       <div className="bill-card p-5">
         <div className="grid gap-4 sm:grid-cols-2">
@@ -412,15 +477,65 @@ function BillEditor({ bill: initialBill }: { bill: Bill }) {
 
       <div className="bill-totals-card">
         <NumberField
-          label="Tax (GST)"
-          value={draft.tax}
-          onChange={(v) => handleBillFieldChange({ tax: v })}
-        />
-        <NumberField
           label="Service charge"
           value={draft.serviceCharge}
           onChange={(v) => handleBillFieldChange({ serviceCharge: v })}
         />
+
+        {(draft.cgst !== undefined && draft.cgst > 0) ||
+        (draft.sgst !== undefined && draft.sgst > 0) ||
+        (draft.vat !== undefined && draft.vat > 0) ? (
+          <>
+            {draft.cgst !== undefined && (
+              <NumberField
+                label="CGST"
+                value={draft.cgst}
+                onChange={(v) =>
+                  handleBillFieldChange({
+                    cgst: v,
+                    tax: (v || 0) + (draft.sgst || 0) + (draft.vat || 0),
+                  })
+                }
+              />
+            )}
+            {draft.sgst !== undefined && (
+              <NumberField
+                label="SGST"
+                value={draft.sgst}
+                onChange={(v) =>
+                  handleBillFieldChange({
+                    sgst: v,
+                    tax: (draft.cgst || 0) + (v || 0) + (draft.vat || 0),
+                  })
+                }
+              />
+            )}
+            {draft.vat !== undefined && (
+              <NumberField
+                label="VAT"
+                value={draft.vat}
+                onChange={(v) =>
+                  handleBillFieldChange({
+                    vat: v,
+                    tax: (draft.cgst || 0) + (draft.sgst || 0) + (v || 0),
+                  })
+                }
+              />
+            )}
+            <NumberField
+              label="Total Tax"
+              value={displayTotalTax}
+              onChange={(v) => handleBillFieldChange({ tax: v })}
+            />
+          </>
+        ) : (
+          <NumberField
+            label="Tax (GST)"
+            value={displayTotalTax}
+            onChange={(v) => handleBillFieldChange({ tax: v })}
+          />
+        )}
+
         <NumberField
           label="Subtotal"
           value={displaySubtotal}

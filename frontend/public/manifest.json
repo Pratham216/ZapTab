@@ -1,0 +1,18 @@
+{
+  "name": "ZapTab — Split Bills Without The Math",
+  "short_name": "ZapTab",
+  "description": "Scan restaurant receipts with AI, split items with friends in real-time, and pay exact shares via UPI.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0a0a",
+  "theme_color": "#0a0a0a",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/favicon.png",
+      "sizes": "192x192 512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

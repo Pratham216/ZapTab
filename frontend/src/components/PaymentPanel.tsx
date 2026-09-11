@@ -8,6 +8,8 @@ import {
   getParticipantShare,
   isMobileDevice,
 } from "../lib/payments";
+import { trackEvent } from "../lib/analytics";
+import { copyToClipboard } from "../lib/clipboard";
 
 interface PaymentPanelProps {
   room: Room;
@@ -25,6 +27,7 @@ export default function PaymentPanel({
   const [marking, setMarking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showQr, setShowQr] = useState(false);
+  const [copiedUpi, setCopiedUpi] = useState(false);
 
   const myShare = getMyShare(room, myGuestId);
   const myParticipant = room.participants.find((p) => p.guestId === myGuestId);
@@ -39,6 +42,7 @@ export default function PaymentPanel({
     setMarking(true);
     try {
       const updated = await markSelfPaid(room.code);
+      trackEvent("payment_marked_paid", { roomCode: room.code, amount });
       onRoomUpdated(updated);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to mark as paid");
@@ -49,10 +53,20 @@ export default function PaymentPanel({
 
   function handlePayWithUpi() {
     if (!upiUrl) return;
+    trackEvent("upi_clicked", { roomCode: room.code, amount });
     if (isMobileDevice()) {
       window.location.href = upiUrl;
     } else {
       setShowQr(true);
+    }
+  }
+
+  async function handleCopyUpi() {
+    if (!room.hostUpiId) return;
+    const ok = await copyToClipboard(room.hostUpiId);
+    if (ok) {
+      setCopiedUpi(true);
+      setTimeout(() => setCopiedUpi(false), 2000);
     }
   }
 
@@ -159,9 +173,18 @@ export default function PaymentPanel({
       )}
 
       {showQr && upiUrl && (
-        <div className="relative flex flex-col items-center gap-2 pt-2">
-          <p className="text-xs text-neutral-400">Scan with any UPI app</p>
+        <div className="relative flex flex-col items-center gap-3 pt-3 border-t border-neutral-800">
+          <p className="text-xs text-neutral-400 font-medium">Scan with GPay, PhonePe, Paytm, or BHIM</p>
           <QRDisplay url={upiUrl} size={160} />
+          {room.hostUpiId && (
+            <button
+              type="button"
+              onClick={handleCopyUpi}
+              className="text-xs text-amber-400 font-mono hover:underline px-3 py-1 rounded bg-neutral-900 border border-neutral-800"
+            >
+              {copiedUpi ? "Copied UPI ID!" : `Copy VPA (${room.hostUpiId})`}
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setShowQr(false)}

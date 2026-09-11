@@ -13,6 +13,11 @@ export function getBillForShare(bill: Bill) {
     subtotal: bill.subtotal,
     tax: bill.tax,
     serviceCharge: bill.serviceCharge,
+    cgst: bill.cgst,
+    sgst: bill.sgst,
+    vat: bill.vat,
+    otherTax: bill.otherTax,
+    grandTotal: bill.grandTotal,
   };
 }
 
