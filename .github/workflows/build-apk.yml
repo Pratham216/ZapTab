@@ -44,21 +44,24 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Setup Gradle cache
+      - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
+
+      - name: Prebuild Android native project
+        working-directory: mobile
+        run: npx expo prebuild --platform android --no-install --clean
 
       - name: Make gradlew executable
         run: chmod +x mobile/android/gradlew
 
       - name: Build Android Release APK
-        run: |
-          cd mobile/android
-          ./gradlew assembleRelease --no-daemon
+        working-directory: mobile/android
+        run: ./gradlew assembleRelease --no-daemon
 
       - name: Prepare APK artifact
         run: |
           mkdir -p output
-          cp mobile/android/app/build/outputs/apk/release/app-release.apk output/ZapTab.apk
+          find mobile/android/app/build/outputs/apk/release -name "*.apk" -exec cp {} output/ZapTab.apk \;
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
