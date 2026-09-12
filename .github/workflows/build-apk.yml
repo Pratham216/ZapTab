@@ -1,0 +1,82 @@
+name: Build ZapTab Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build Android Release APK
+    runs-on: ubuntu-latest
+
+    env:
+      EXPO_PUBLIC_API_URL: https://splitsnap-wrrg.onrender.com
+      EXPO_PUBLIC_SUPPORT_EMAIL: prathambisht282@gmail.com
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Build shared workspace package
+        run: pnpm --filter shared build
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Gradle cache
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Make gradlew executable
+        run: chmod +x mobile/android/gradlew
+
+      - name: Build Android Release APK
+        run: |
+          cd mobile/android
+          ./gradlew assembleRelease --no-daemon
+
+      - name: Prepare APK artifact
+        run: |
+          mkdir -p output
+          cp mobile/android/app/build/outputs/apk/release/app-release.apk output/ZapTab.apk
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ZapTab-Android-APK
+          path: output/ZapTab.apk
+          retention-days: 30
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+        with:
+          files: output/ZapTab.apk
+          tag_name: v1.0.0
+          name: ZapTab Mobile v1.0.0
+          body: |
+            ## ZapTab Android App
+            - Download and install **ZapTab.apk** on any Android device.
+            - Connected to live backend at `https://splitsnap-wrrg.onrender.com`.
+          draft: false
+          prerelease: false
