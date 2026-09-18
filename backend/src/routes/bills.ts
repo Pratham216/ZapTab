@@ -45,6 +45,7 @@ router.post("/upload", upload.single("file"), async (req, res) => {
 
     const bill = await Bill.create({
       status: "processing",
+      imagePath: req.file.path,
       tempFilePath: req.file.path,
       tempFileExpiresAt: expiresAt,
       items: [],
@@ -72,6 +73,27 @@ router.get("/:id", async (req, res) => {
     return;
   }
   res.json(serializeBill(bill));
+});
+
+router.get("/:id/image", async (req, res) => {
+  try {
+    const bill = await Bill.findById(req.params.id);
+    if (!bill) {
+      res.status(404).json({ error: "Bill not found" });
+      return;
+    }
+
+    const filePath = bill.imagePath || bill.tempFilePath;
+    if (!filePath) {
+      res.status(404).json({ error: "Image not found for this bill" });
+      return;
+    }
+
+    const resolved = path.resolve(filePath);
+    res.sendFile(resolved);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to load bill image" });
+  }
 });
 
 router.get("/:id/status", async (req, res) => {

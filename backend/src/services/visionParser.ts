@@ -123,6 +123,7 @@ async function readImageDataUrl(imagePath: string) {
 async function callOpenRouterVision(dataUrl: string, model: string) {
   const response = await fetch(OPENROUTER_CHAT_URL, {
     method: "POST",
+    signal: AbortSignal.timeout(35000),
     headers: {
       Authorization: `Bearer ${config.openRouterApiKey}`,
       "Content-Type": "application/json",
@@ -164,6 +165,7 @@ async function callOpenRouterVision(dataUrl: string, model: string) {
 async function callNvidiaVision(dataUrl: string, model: string) {
   const response = await fetch(NVIDIA_CHAT_URL, {
     method: "POST",
+    signal: AbortSignal.timeout(30000),
     headers: {
       Authorization: `Bearer ${config.nvidiaApiKey}`,
       "Content-Type": "application/json",
@@ -240,10 +242,26 @@ export async function parseBillFromImage(imagePath: string) {
   );
   const startTime = Date.now();
 
-  const data =
-    config.visionProvider === "nvidia"
-      ? await callNvidiaVision(dataUrl, model)
-      : await callOpenRouterVision(dataUrl, model);
+  let data: { choices?: Array<{ message?: { content?: string } }> };
+  let usedTag = getModelTag();
+
+  try {
+    data =
+      config.visionProvider === "nvidia"
+        ? await callNvidiaVision(dataUrl, model)
+        : await callOpenRouterVision(dataUrl, model);
+  } catch (primaryErr) {
+    // If NVIDIA fails or times out, fall back to OpenRouter (gpt-4o-mini)
+    if (config.visionProvider === "nvidia" && config.openRouterApiKey) {
+      console.warn(
+        `[VisionParser] NVIDIA failed (${primaryErr instanceof Error ? primaryErr.message : primaryErr}). Falling back to OpenRouter ${config.openRouterVisionModel}...`
+      );
+      usedTag = `openrouter/${config.openRouterVisionModel}`;
+      data = await callOpenRouterVision(dataUrl, config.openRouterVisionModel);
+    } else {
+      throw primaryErr;
+    }
+  }
 
   const durationMs = Date.now() - startTime;
   const durationSec = (durationMs / 1000).toFixed(2);
@@ -257,7 +275,7 @@ export async function parseBillFromImage(imagePath: string) {
   const parsed = ParsedBillSchema.parse(json);
   sanitizeRestaurantName(parsed);
   console.log(
-    `Vision parse OK (${getModelTag()}): ${parsed.items.length} items extracted in ⏱️ ${durationSec}s (${durationMs}ms)`
+    `Vision parse OK (${usedTag}): ${parsed.items.length} items extracted in ⏱️ ${durationSec}s (${durationMs}ms)`
   );
   for (const item of parsed.items) {
     console.log(

@@ -18,11 +18,21 @@ export interface Bill {
   subtotal?: number;
   tax: number;
   serviceCharge: number;
+  cgst?: number;
+  sgst?: number;
+  vat?: number;
+  otherTax?: number;
   grandTotal?: number;
   status: "uploading" | "processing" | "parsed" | "failed";
   errorMessage?: string;
+  hasImage?: boolean;
+  imageUrl?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export function getBillImageUrl(billId: string): string {
+  return `${getApiUrl()}/bills/${billId}/image`;
 }
 
 export interface PickedReceiptAsset {

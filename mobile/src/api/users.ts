@@ -66,6 +66,36 @@ export async function registerWithPassword(
   return postAuth("/auth/register", { email, password, name });
 }
 
+export async function syncClerkUser(clerkToken: string): Promise<AuthSessionResponse> {
+  const url = `${getApiUrl()}/auth/sync`;
+  console.log("[Users] syncClerkUser called");
+
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${clerkToken}`,
+        "Content-Type": "application/json",
+      },
+    });
+  } catch (err) {
+    console.error("[Users] Network error on POST /auth/sync:", err);
+    throw err;
+  }
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    console.error("[Users] POST /auth/sync error response:", data);
+    throw new Error(
+      typeof data.error === "string" ? data.error : "Failed to sync account"
+    );
+  }
+
+  console.log("[Users] syncClerkUser success, user:", (data as AuthSessionResponse).user?.email);
+  return data as AuthSessionResponse;
+}
+
 export async function getCurrentUser(): Promise<AppUser> {
   console.log("[Users] getCurrentUser called");
   const user = await apiRequest<AppUser>("/users/me");

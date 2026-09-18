@@ -32,6 +32,8 @@ export interface ReceiptEntry {
   total?: number;
   roomCode?: string;
   savedAt: string;
+  imageUri?: string;
+  imageUrl?: string;
 }
 
 export interface RoomEntry {
@@ -64,6 +66,8 @@ export async function saveReceipt(
   const merged: ReceiptEntry = {
     ...existing,
     ...entry,
+    imageUri: entry.imageUri ?? existing?.imageUri,
+    imageUrl: entry.imageUrl ?? existing?.imageUrl,
     roomCode: entry.roomCode ?? existing?.roomCode,
     savedAt: new Date().toISOString(),
   };

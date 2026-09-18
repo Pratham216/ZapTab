@@ -4,3 +4,5 @@ dist/
 backend/temp/
 *.log
 .DS_Store
+.agents/
+scratch/

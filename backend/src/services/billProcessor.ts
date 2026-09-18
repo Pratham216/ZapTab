@@ -125,7 +125,7 @@ export async function processBill(billId: string): Promise<void> {
 
     applyParsedBill(bill, parsed, ocrText || undefined);
 
-    await deleteTempFile(filePath);
+    bill.imagePath = filePath;
     bill.tempFilePath = undefined;
     bill.tempFileExpiresAt = undefined;
     await bill.save();
@@ -168,6 +168,10 @@ export function serializeBill(bill: IBill) {
     isItemSubtotalValid: bill.isItemSubtotalValid ?? true,
     requiresVerification: bill.requiresVerification ?? false,
     validationWarnings: bill.validationWarnings ?? [],
+    hasImage: Boolean(bill.imagePath || bill.tempFilePath),
+    imageUrl: (bill.imagePath || bill.tempFilePath)
+      ? `/bills/${bill._id.toString()}/image`
+      : undefined,
     status: bill.status,
     errorMessage: bill.errorMessage,
     createdAt: bill.createdAt,

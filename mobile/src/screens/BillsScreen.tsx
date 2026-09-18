@@ -2,6 +2,10 @@ import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Image,
+  Linking,
+  Modal,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -17,7 +21,7 @@ import MobileHeader from "../components/MobileHeader";
 import Button from "../components/Button";
 import { useOpenScan } from "../contexts/ScanContext";
 import { useAuth } from "../contexts/AuthContext";
-import { getBill } from "../api/bills";
+import { getBill, getBillImageUrl } from "../api/bills";
 import { createRoom } from "../api/rooms";
 import { getBillDisplayTotal } from "../lib/billTotals";
 import {
@@ -48,6 +52,52 @@ function formatMoney(value?: number): string {
   return `₹${value.toFixed(2)}`;
 }
 
+async function handleDownloadImage(imageUri: string, restaurantName?: string) {
+  try {
+    const cleanName = (restaurantName || "receipt")
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, "-")
+      .slice(0, 30);
+    const filename = `${cleanName || "receipt"}-bill.jpg`;
+
+    if (Platform.OS === "web") {
+      try {
+        const response = await fetch(imageUri);
+        const blob = await response.blob();
+        const blobUrl = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = blobUrl;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 1500);
+      } catch {
+        const link = document.createElement("a");
+        link.href = imageUri;
+        link.download = filename;
+        link.target = "_blank";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+      return;
+    }
+
+    if (imageUri.startsWith("http://") || imageUri.startsWith("https://")) {
+      const can = await Linking.canOpenURL(imageUri);
+      if (can) {
+        await Linking.openURL(imageUri);
+        return;
+      }
+    }
+
+    Alert.alert("Receipt Saved", "Receipt image is available on your device.");
+  } catch (err) {
+    Alert.alert("Download Error", "Could not download receipt image.");
+  }
+}
+
 export default function BillsScreen() {
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -57,6 +107,10 @@ export default function BillsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [splittingBillId, setSplittingBillId] = useState<string | null>(null);
+  const [previewReceipt, setPreviewReceipt] = useState<{
+    receipt: ReceiptEntry;
+    imageUri: string;
+  } | null>(null);
 
   const load = useCallback(async () => {
     const list = await getRecentReceipts();
@@ -168,6 +222,9 @@ export default function BillsScreen() {
               onEdit={() =>
                 navigation.navigate("BillReview", { billId: receipt.billId })
               }
+              onOpenImage={(imageUri) =>
+                setPreviewReceipt({ receipt, imageUri })
+              }
               onRemove={() => {
                 Alert.alert(
                   "Remove bill?",
@@ -189,6 +246,15 @@ export default function BillsScreen() {
           ))}
         </ScrollView>
       )}
+
+      {previewReceipt ? (
+        <BillImageModal
+          visible={Boolean(previewReceipt)}
+          receipt={previewReceipt.receipt}
+          imageUri={previewReceipt.imageUri}
+          onClose={() => setPreviewReceipt(null)}
+        />
+      ) : null}
     </ScreenContainer>
   );
 }
@@ -213,19 +279,64 @@ function ReceiptCard({
   onSplit,
   onEdit,
   onRemove,
+  onOpenImage,
 }: {
   receipt: ReceiptEntry;
   splitting: boolean;
   onSplit: () => void;
   onEdit: () => void;
   onRemove: () => void;
+  onOpenImage: (imageUri: string) => void;
 }) {
+  const imageSource =
+    receipt.imageUri ||
+    receipt.imageUrl ||
+    getBillImageUrl(receipt.billId);
+
+  const [hasError, setHasError] = useState(false);
+  const showImage = Boolean(imageSource && !hasError);
+
+  const handleThumbPress = () => {
+    if (showImage && imageSource) {
+      onOpenImage(imageSource);
+    } else {
+      Alert.alert(
+        "Receipt Image",
+        "Original receipt image is not available for this bill."
+      );
+    }
+  };
+
   return (
     <View style={styles.card}>
       <View style={styles.cardTop}>
-        <View style={styles.thumb}>
-          <Ionicons name="document-text" size={24} color={colors.textMuted} />
-        </View>
+        <Pressable
+          onPress={handleThumbPress}
+          style={({ pressed }) => [
+            styles.thumb,
+            showImage && styles.thumbWithImage,
+            pressed && styles.thumbPressed,
+          ]}
+          accessibilityLabel="View receipt image"
+          accessibilityRole="button"
+        >
+          {showImage ? (
+            <>
+              <Image
+                source={{ uri: imageSource }}
+                style={styles.thumbImage}
+                resizeMode="cover"
+                onError={() => setHasError(true)}
+              />
+              <View style={styles.thumbBadge}>
+                <Ionicons name="expand-outline" size={11} color="#FFFFFF" />
+              </View>
+            </>
+          ) : (
+            <Ionicons name="document-text" size={24} color={colors.textMuted} />
+          )}
+        </Pressable>
+
         <View style={styles.cardInfo}>
           <Text style={styles.storeName} numberOfLines={1}>
             {receipt.restaurantName || "Untitled bill"}
@@ -259,6 +370,104 @@ function ReceiptCard({
         </Pressable>
       </View>
     </View>
+  );
+}
+
+function BillImageModal({
+  visible,
+  receipt,
+  imageUri,
+  onClose,
+}: {
+  visible: boolean;
+  receipt: ReceiptEntry;
+  imageUri: string;
+  onClose: () => void;
+}) {
+  const [loadingImg, setLoadingImg] = useState(true);
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+    >
+      <View style={styles.modalBackdrop}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+        <View style={styles.modalContent}>
+          <View style={styles.modalHeader}>
+            <View style={styles.modalHeaderInfo}>
+              <Text style={styles.modalTitle} numberOfLines={1}>
+                {receipt.restaurantName || "Receipt"}
+              </Text>
+              <Text style={styles.modalSubtitle}>
+                {formatMoney(receipt.total)} · {formatSavedAt(receipt.savedAt)}
+              </Text>
+            </View>
+            <View style={styles.modalHeaderActions}>
+              <Pressable
+                style={({ pressed }) => [
+                  styles.modalDownloadChip,
+                  pressed && styles.chipPressed,
+                ]}
+                onPress={() =>
+                  void handleDownloadImage(imageUri, receipt.restaurantName)
+                }
+              >
+                <Ionicons
+                  name="download-outline"
+                  size={15}
+                  color={colors.onGold}
+                />
+                <Text style={styles.modalDownloadChipText}>Download</Text>
+              </Pressable>
+              <Pressable
+                style={styles.modalCloseBtn}
+                onPress={onClose}
+                hitSlop={10}
+              >
+                <Ionicons name="close" size={20} color={colors.textPrimary} />
+              </Pressable>
+            </View>
+          </View>
+
+          <View style={styles.modalImageWrap}>
+            {loadingImg ? (
+              <ActivityIndicator
+                size="large"
+                color={colors.gold}
+                style={StyleSheet.absoluteFill}
+              />
+            ) : null}
+            <Image
+              source={{ uri: imageUri }}
+              style={styles.modalFullImage}
+              resizeMode="contain"
+              onLoadStart={() => setLoadingImg(true)}
+              onLoadEnd={() => setLoadingImg(false)}
+            />
+          </View>
+
+          <View style={styles.modalFooter}>
+            <Button
+              label="Download receipt image"
+              variant="primary"
+              fullWidth
+              onPress={() =>
+                void handleDownloadImage(imageUri, receipt.restaurantName)
+              }
+            />
+            <Button
+              label="Close"
+              variant="secondary"
+              fullWidth
+              onPress={onClose}
+            />
+          </View>
+        </View>
+      </View>
+    </Modal>
   );
 }
 
@@ -392,12 +601,35 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   thumb: {
-    width: 48,
-    height: 48,
+    width: 52,
+    height: 52,
     borderRadius: radius.md,
     backgroundColor: colors.surfaceElevated,
     alignItems: "center",
     justifyContent: "center",
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: colors.border,
+    position: "relative",
+  },
+  thumbWithImage: {
+    borderColor: colors.goldBorder,
+  },
+  thumbPressed: {
+    opacity: 0.82,
+    transform: [{ scale: 0.96 }],
+  },
+  thumbImage: {
+    width: "100%",
+    height: "100%",
+  },
+  thumbBadge: {
+    position: "absolute",
+    bottom: 2,
+    right: 2,
+    backgroundColor: "rgba(0, 0, 0, 0.7)",
+    borderRadius: radius.pill,
+    padding: 3,
   },
   cardInfo: {
     flex: 1,
@@ -452,5 +684,96 @@ const styles = StyleSheet.create({
   removeBtn: {
     marginLeft: "auto",
     padding: spacing.xs,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.88)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: spacing.md,
+  },
+  modalContent: {
+    width: "100%",
+    maxWidth: 520,
+    maxHeight: "90%",
+    backgroundColor: colors.surface,
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    overflow: "hidden",
+    flexDirection: "column",
+  },
+  modalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    backgroundColor: colors.surfaceElevated,
+  },
+  modalHeaderInfo: {
+    flex: 1,
+    marginRight: spacing.sm,
+  },
+  modalTitle: {
+    color: colors.textPrimary,
+    fontSize: fontSize.md,
+    fontWeight: "700",
+  },
+  modalSubtitle: {
+    color: colors.gold,
+    fontSize: fontSize.xs,
+    marginTop: 2,
+    fontWeight: "600",
+  },
+  modalHeaderActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+  },
+  modalDownloadChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: colors.gold,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs + 2,
+    borderRadius: radius.pill,
+  },
+  modalDownloadChipText: {
+    color: colors.onGold,
+    fontSize: fontSize.xs,
+    fontWeight: "700",
+  },
+  modalCloseBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surface,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  modalImageWrap: {
+    width: "100%",
+    height: 380,
+    backgroundColor: "#000000",
+    alignItems: "center",
+    justifyContent: "center",
+    position: "relative",
+  },
+  modalFullImage: {
+    width: "100%",
+    height: "100%",
+  },
+  modalFooter: {
+    padding: spacing.md,
+    gap: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    backgroundColor: colors.surface,
   },
 });

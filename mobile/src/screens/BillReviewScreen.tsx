@@ -25,17 +25,18 @@ import { useAuth } from "../contexts/AuthContext";
 
 type Props = NativeStackScreenProps<RootStackParamList, "BillReview">;
 
-async function persistReceiptFromBill(bill: Bill, roomCode?: string) {
+async function persistReceiptFromBill(bill: Bill, roomCode?: string, imageUri?: string) {
   await saveReceipt({
     billId: bill.id,
     restaurantName: bill.restaurantName,
     total: getBillDisplayTotal(bill),
     roomCode,
+    imageUri,
   });
 }
 
 export default function BillReviewScreen({ navigation, route }: Props) {
-  const { billId, focusSplit } = route.params;
+  const { billId, focusSplit, imageUri } = route.params;
   const { user } = useAuth();
   const [bill, setBill] = useState<Bill | null>(null);
   const [status, setStatus] = useState<Bill["status"]>("processing");
@@ -46,9 +47,9 @@ export default function BillReviewScreen({ navigation, route }: Props) {
   const handleBillChange = useCallback(
     async (next: Bill) => {
       setBill(next);
-      await persistReceiptFromBill(next, roomCode);
+      await persistReceiptFromBill(next, roomCode, imageUri);
     },
-    [roomCode]
+    [roomCode, imageUri]
   );
 
   const loadBill = useCallback(async () => {
@@ -77,7 +78,7 @@ export default function BillReviewScreen({ navigation, route }: Props) {
           if (!cancelled) {
             setBill(data);
             if (data.status === "parsed") {
-              await persistReceiptFromBill(data);
+              await persistReceiptFromBill(data, undefined, imageUri);
             }
           }
           return;

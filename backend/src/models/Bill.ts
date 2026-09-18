@@ -34,6 +34,7 @@ export interface IBill {
   ocrText?: string;
   status: BillStatus;
   errorMessage?: string;
+  imagePath?: string;
   tempFilePath?: string;
   tempFileExpiresAt?: Date;
   createdAt: Date;
@@ -79,6 +80,7 @@ const billSchema = new Schema<IBill>(
       default: "uploading",
     },
     errorMessage: { type: String },
+    imagePath: { type: String },
     tempFilePath: { type: String },
     tempFileExpiresAt: { type: Date },
   },

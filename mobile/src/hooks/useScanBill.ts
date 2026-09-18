@@ -3,6 +3,7 @@ import { Alert } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { uploadBillImage } from "../api/bills";
+import { saveReceipt } from "../lib/history";
 import type { RootStackParamList } from "../navigation/AppNavigator";
 
 export function useScanBill(
@@ -27,8 +28,16 @@ export function useScanBill(
 
     try {
       const { id } = await uploadBillImage(asset);
+      await saveReceipt({
+        billId: id,
+        restaurantName: "Receipt",
+        imageUri: asset.uri,
+      });
       setSheetVisible(false);
-      navigation.navigate("BillReview", { billId: id });
+      navigation.navigate("BillReview", {
+        billId: id,
+        imageUri: asset.uri,
+      });
     } catch (err) {
       const message = err instanceof Error ? err.message : "Upload failed";
       setError(message);

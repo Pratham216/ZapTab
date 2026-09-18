@@ -1,10 +1,13 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getApiUrl } from "./config";
 
+import type { AppUser } from "../api/users";
+
 const TOKEN_KEY = "zaptab_token";
 const GUEST_ID_KEY = "zaptab_guest_id";
 const USER_TOKEN_KEY = "zaptab_user_token";
 const USER_GUEST_ID_KEY = "zaptab_user_guest_id";
+const USER_PROFILE_KEY = "zaptab_user_profile";
 
 export interface GuestSession {
   token: string;
@@ -63,11 +66,36 @@ export async function setUserSession(token: string, guestId: string): Promise<vo
   console.log("[Auth] User session saved ✓");
 }
 
+export async function getStoredUserProfile(): Promise<AppUser | null> {
+  try {
+    const raw = await AsyncStorage.getItem(USER_PROFILE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as AppUser;
+  } catch (e) {
+    console.error("[Auth] Error parsing cached user profile:", e);
+    return null;
+  }
+}
+
+export async function saveStoredUserProfile(user: AppUser): Promise<void> {
+  try {
+    await AsyncStorage.setItem(USER_PROFILE_KEY, JSON.stringify(user));
+    console.log("[Auth] Cached user profile saved ✓");
+  } catch (e) {
+    console.error("[Auth] Error saving user profile:", e);
+  }
+}
+
+export async function clearUserProfile(): Promise<void> {
+  await AsyncStorage.removeItem(USER_PROFILE_KEY);
+}
+
 export async function clearUserSession(): Promise<void> {
-  console.log("[Auth] Clearing user session from storage");
+  console.log("[Auth] Clearing user session and profile from storage");
   await Promise.all([
     AsyncStorage.removeItem(USER_TOKEN_KEY),
     AsyncStorage.removeItem(USER_GUEST_ID_KEY),
+    clearUserProfile(),
   ]);
 }
 

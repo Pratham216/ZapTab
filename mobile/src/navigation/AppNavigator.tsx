@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { NavigationContainer, DarkTheme } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
@@ -9,12 +10,13 @@ import SignInScreen from "../screens/SignInScreen";
 import OnboardingScreen from "../screens/OnboardingScreen";
 import Button from "../components/Button";
 import ScreenContainer from "../components/ScreenContainer";
+import AnimatedSplashScreen from "../components/AnimatedSplashScreen";
 import { useAuth } from "../contexts/AuthContext";
 import { colors, spacing, typography } from "../theme";
 
 export type RootStackParamList = {
   Main: undefined;
-  BillReview: { billId: string; focusSplit?: boolean };
+  BillReview: { billId: string; focusSplit?: boolean; imageUri?: string };
   Room: { code: string };
   Status: undefined;
 };
@@ -36,9 +38,9 @@ const theme = {
 function BootstrapLoading({ message }: { message?: string }) {
   return (
     <ScreenContainer center>
-      <ActivityIndicator size="large" color={colors.accent} />
+      <ActivityIndicator size="large" color={colors.gold} />
       <Text style={[typography.body, styles.loadingText]}>
-        {message ?? "Starting your session…"}
+        {message ?? "Connecting to ZapTab…"}
       </Text>
     </ScreenContainer>
   );
@@ -81,31 +83,41 @@ function MainAppNavigator() {
 
 export default function AppNavigator() {
   const { phase, error, refresh } = useAuth();
+  const [splashVisible, setSplashVisible] = useState(true);
 
-  if (phase === "loading" || phase === "syncing") {
-    return (
-      <BootstrapLoading
-        message={phase === "syncing" ? "Setting up your account…" : undefined}
-      />
-    );
-  }
+  const isReady = phase !== "loading" && phase !== "syncing";
 
-  if (phase === "sign_in") {
-    return <SignInScreen />;
-  }
+  return (
+    <View style={styles.rootContainer}>
+      {phase === "loading" || phase === "syncing" ? (
+        <BootstrapLoading
+          message={phase === "syncing" ? "Syncing your account…" : undefined}
+        />
+      ) : phase === "sign_in" ? (
+        <SignInScreen />
+      ) : phase === "onboarding" ? (
+        <OnboardingScreen />
+      ) : phase === "error" ? (
+        <BootstrapError error={error} onRetry={refresh} />
+      ) : (
+        <MainAppNavigator />
+      )}
 
-  if (phase === "onboarding") {
-    return <OnboardingScreen />;
-  }
-
-  if (phase === "error") {
-    return <BootstrapError error={error} onRetry={refresh} />;
-  }
-
-  return <MainAppNavigator />;
+      {splashVisible && (
+        <AnimatedSplashScreen
+          isReady={isReady}
+          onDismiss={() => setSplashVisible(false)}
+        />
+      )}
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
+  rootContainer: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
   loadingText: {
     marginTop: spacing.lg,
   },

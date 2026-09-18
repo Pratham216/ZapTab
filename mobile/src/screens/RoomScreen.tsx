@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -105,6 +106,32 @@ export default function RoomScreen({ navigation, route }: Props) {
   }
 
   async function handleLeave() {
+    const doLeave = async () => {
+      try {
+        await leaveRoom(roomCode);
+      } catch (err) {
+        console.warn("Error leaving room on server:", err);
+      } finally {
+        navigation.reset({
+          index: 0,
+          routes: [{ name: "Main" }],
+        });
+      }
+    };
+
+    if (Platform.OS === "web") {
+      const confirmed =
+        typeof window !== "undefined"
+          ? window.confirm(
+              "Leave room?\n\nYou'll exit this bill split. You can rejoin with the room code."
+            )
+          : true;
+      if (confirmed) {
+        await doLeave();
+      }
+      return;
+    }
+
     Alert.alert(
       "Leave room?",
       "You'll exit this bill split. You can rejoin with the room code.",
@@ -113,13 +140,7 @@ export default function RoomScreen({ navigation, route }: Props) {
         {
           text: "Leave",
           style: "destructive",
-          onPress: async () => {
-            await leaveRoom(roomCode);
-            navigation.reset({
-              index: 0,
-              routes: [{ name: "Main" }],
-            });
-          },
+          onPress: () => void doLeave(),
         },
       ]
     );
